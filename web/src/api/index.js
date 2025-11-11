@@ -49,4 +49,17 @@ export default {
   updateWechatLogo: (data = {}) => request.post('/wechat/update_logo', data),
   updateWechatQrcode: (data = {}) => request.post('/wechat/update_qrcode', data),
   updateWechatStatus: (data = {}) => request.post('/wechat/update_status', data),
+  uploadWechatFile: (formData) => request.post('/wechat/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  restoreWechat: (data = {}) => request.post('/wechat/restore', data),
+
+  // crawler management
+  getCrawlerTasks: (params = {}) => request.get('/crawler/task/list', { params }),
+  createCrawlerTask: (data = {}) => request.post('/crawler/task/create', data),
+  startCrawlerTask: (data = {}) => request.post('/crawler/task/start', data),
+  stopCrawlerTask: (data = {}) => request.post('/crawler/task/stop', data),
+  getCrawlerTaskStatus: (params = {}) => request.get('/crawler/task/status', { params }),
+  updateCrawlerTask: (data = {}) => request.post('/crawler/task/update', data),
+  syncOdsToWechat: (data = {}) => request.post('/crawler/ods/sync_to_wechat', data),
 }

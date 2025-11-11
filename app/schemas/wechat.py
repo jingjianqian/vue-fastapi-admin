@@ -62,3 +62,7 @@ class WechatUpdateQrcode(BaseModel):
 class WechatUpdateStatus(BaseModel):
     id: int
     publish_status: PublishStatus
+
+
+class WechatRestore(BaseModel):
+    id: int

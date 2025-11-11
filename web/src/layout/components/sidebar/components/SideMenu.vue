@@ -101,7 +101,9 @@ function handleMenuSelect(key, item) {
     if (item.path === curRoute.path) {
       appStore.reloadPage()
     } else {
-      router.push(item.path)
+      router.push(item.path).catch(err => {
+        console.error('[SideMenu] 路由跳转失败:', err)
+      })
     }
   }
 }

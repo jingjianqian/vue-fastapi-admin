@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375" height="812" viewBox="0 0 375 812" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg{fill:#F7F8FA}
+      .surface{fill:#FFFFFF}
+      .card{fill:#FFFFFF;stroke:#E5E6EB;stroke-width:1}
+      .title{font:600 18px 'Segoe UI',Arial}
+      .text{font:500 14px 'Segoe UI',Arial; fill:#1D2129}
+      .muted{font:400 12px 'Segoe UI',Arial; fill:#86909C}
+      .small{font:400 11px 'Segoe UI',Arial; fill:#A1A7B3}
+      .brand{fill:#07C160}
+      .brandText{fill:#07C160}
+      .btn{fill:#07C160}
+      .btnGhost{fill:#FFFFFF;stroke:#07C160}
+      .btnText{font:600 12px 'Segoe UI',Arial; fill:#fff}
+      .btnGhostText{font:600 12px 'Segoe UI',Arial; fill:#07C160}
+      .chip{fill:#F7F8FA;stroke:#E5E6EB}
+      .chip-active{fill:#E8F7F0;stroke:#07C160}
+      .dot{fill:#E5E6EB}
+      .dot-active{fill:#07C160}
+      .tag{fill:#E8F7F0;stroke:#07C160}
+      .tagText{font:600 10px 'Segoe UI',Arial; fill:#07C160}
+      .shadow{filter:url(#shadow)}
+    </style>
+    <linearGradient id="bannerGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+  <rect class="bg" x="0" y="0" width="375" height="812"/>
+
+  <!-- NavBar -->
+  <rect x="0" y="0" width="375" height="88" class="surface"/>
+  <text x="20" y="56" class="title">首页</text>
+
+  <!-- Search (sticky when scrolled) -->
+  <rect x="16" y="96" width="343" height="36" rx="18" fill="#F2F3F5" stroke="#E5E6EB"/>
+  <!-- magnifier -->
+  <circle cx="36" cy="114" r="8" stroke="#C9CDD4" stroke-width="2" fill="none"/>
+  <line x1="42" y1="120" x2="48" y2="126" stroke="#C9CDD4" stroke-width="2"/>
+  <text x="60" y="119" class="muted">搜索小程序、分类或功能</text>
+  <!-- clear -->
+  <line x1="336" y1="108" x2="344" y2="116" stroke="#C9CDD4"/>
+  <line x1="344" y1="108" x2="336" y2="116" stroke="#C9CDD4"/>
+
+  <!-- Banner carousel -->
+  <rect x="16" y="144" width="343" height="140" rx="12" fill="url(#bannerGrad)" class="shadow"/>
+  <text x="32" y="196" class="text" fill="#FFFFFF">本周精选 · 提升效率</text>
+  <rect x="268" y="190" width="76" height="30" rx="8" class="btnGhost"/>
+  <text x="292" y="209" class="btnGhostText">查看</text>
+  <!-- indicators -->
+  <circle cx="168" cy="290" r="3" class="dot-active"/>
+  <circle cx="182" cy="290" r="3" class="dot"/>
+  <circle cx="196" cy="290" r="3" class="dot"/>
+
+  <!-- Top (Pinned + Backend top) -->
+  <text x="16" y="324" class="text" fill="#4E5969">常用置顶</text>
+  <rect x="16" y="334" width="106" height="84" rx="10" class="card shadow"/>
+  <circle cx="42" cy="362" r="16" fill="#E8F7F0"/>
+  <text x="64" y="368" class="muted">工具箱</text>
+  <rect x="130" y="334" width="106" height="84" rx="10" class="card shadow"/>
+  <circle cx="156" cy="362" r="16" fill="#E8F0FE"/>
+  <text x="178" y="368" class="muted">记事本</text>
+  <rect x="244" y="334" width="115" height="84" rx="10" class="card shadow"/>
+  <text x="258" y="360" class="small">更多…</text>
+
+  <!-- Categories -->
+  <text x="16" y="440" class="text" fill="#4E5969">分类</text>
+  <rect x="16" y="448" width="58" height="26" rx="13" class="chip-active"/>
+  <text x="34" y="465" class="small" fill="#07C160">全部</text>
+  <rect x="82" y="448" width="66" height="26" rx="13" class="chip"/>
+  <text x="98" y="465" class="small">工具</text>
+  <rect x="156" y="448" width="66" height="26" rx="13" class="chip"/>
+  <text x="172" y="465" class="small">生活</text>
+  <rect x="230" y="448" width="80" height="26" rx="13" class="chip"/>
+  <text x="246" y="465" class="small">效率</text>
+
+  <!-- App list: card 1 -->
+  <g>
+    <rect x="16" y="486" width="343" height="100" rx="12" class="card shadow"/>
+    <rect x="28" y="504" width="52" height="52" rx="12" fill="#F2F3F5"/>
+    <text x="88" y="520" class="text">企业审批</text>
+    <text x="88" y="540" class="muted">提交/查询单据，支持离线</text>
+    <!-- tag pinned -->
+    <rect x="88" y="546" width="38" height="16" rx="8" class="tag"/>
+    <text x="95" y="558" class="tagText">置顶</text>
+    <!-- favorite star -->
+    <polygon points="320,508 324,520 337,520 326,528 330,540 320,533 310,540 314,528 303,520 316,520" fill="#FFC53D" stroke="#D48806"/>
+    <!-- open button -->
+    <rect x="260" y="546" width="76" height="26" rx="6" class="btn"/>
+    <text x="286" y="563" class="btnText">打开</text>
+  </g>
+
+  <!-- App list: card 2 -->
+  <g>
+    <rect x="16" y="596" width="343" height="100" rx="12" class="card shadow"/>
+    <rect x="28" y="614" width="52" height="52" rx="12" fill="#F2F3F5"/>
+    <text x="88" y="630" class="text">报销助手</text>
+    <text x="88" y="650" class="muted">拍照识别发票，一键导出</text>
+    <!-- star off -->
+    <polygon points="320,618 324,630 337,630 326,638 330,650 320,643 310,650 314,638 303,630 316,630" fill="#FFF" stroke="#C9CDD4"/>
+    <!-- open button -->
+    <rect x="260" y="656" width="76" height="26" rx="6" class="btn"/>
+    <text x="286" y="673" class="btnText">打开</text>
+  </g>
+
+  <!-- Hint -->
+  <text x="16" y="742" class="small">点击卡片优先直跳（appid/path），否则弹出二维码</text>
+
+  <!-- TabBar -->
+  <rect x="0" y="760" width="375" height="52" class="surface" stroke="#E5E6EB"/>
+  <!-- home icon -->
+  <rect x="66" y="768" width="20" height="20" rx="4" class="brand"/>
+  <text x="64" y="792" class="small" fill="#07C160">首页</text>
+  <!-- fav icon -->
+  <rect x="174" y="768" width="20" height="20" rx="10" fill="#C9CDD4"/>
+  <text x="168" y="792" class="small" fill="#4E5969">收藏</text>
+  <!-- profile icon -->
+  <circle cx="286" cy="778" r="10" fill="#C9CDD4"/>
+  <text x="278" y="792" class="small" fill="#4E5969">我的</text>
+</svg>

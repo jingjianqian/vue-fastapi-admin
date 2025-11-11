@@ -25,24 +25,36 @@ function buildRoutes(routes = []) {
 
     if (e.children && e.children.length > 0) {
       // 有子菜单
-      route.children = e.children.map((e_child) => ({
-        name: e_child.name,
-        path: e_child.path,
-        component: vueModules[`/src/views${e_child.component}/index.vue`],
-        isHidden: e_child.is_hidden,
-        meta: {
-          title: e_child.name,
-          icon: e_child.icon,
-          order: e_child.order,
-          keepAlive: e_child.keepalive,
-        },
-      }))
+      route.children = e.children.map((e_child) => {
+        const componentPath = `/src/views${e_child.component}/index.vue`
+        const component = vueModules[componentPath]
+        if (!component) {
+          console.error(`[路由构建] 组件未找到: ${componentPath}`, '可用:', Object.keys(vueModules))
+        }
+        return {
+          name: e_child.name,
+          path: e_child.path,
+          component,
+          isHidden: e_child.is_hidden,
+          meta: {
+            title: e_child.name,
+            icon: e_child.icon,
+            order: e_child.order,
+            keepAlive: e_child.keepalive,
+          },
+        }
+      })
     } else {
       // 没有子菜单，创建一个默认的子路由
+      const componentPath = `/src/views${e.component}/index.vue`
+      const component = vueModules[componentPath]
+      if (!component) {
+        console.error(`[路由构建] 组件未找到: ${componentPath}`, '可用:', Object.keys(vueModules))
+      }
       route.children.push({
         name: `${e.name}Default`,
         path: '',
-        component: vueModules[`/src/views${e.component}/index.vue`],
+        component,
         isHidden: true,
         meta: {
           title: e.name,

@@ -30,5 +30,12 @@ class WechatController(CRUDBase[WechatApp, WechatCreate, WechatUpdate]):
         await obj.save()
         return obj
 
+    async def restore(self, id: int):
+        """恢复已删除的记录"""
+        obj = await self.get(id=id)
+        obj.is_deleted = False
+        await obj.save()
+        return obj
+
 
 wechat_controller = WechatController()

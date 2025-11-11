@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="360" height="120" viewBox="0 0 360 120" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .box{fill:#fff;stroke:#222;stroke-width:1}
+    .label{font-size:12px;fill:#222;font-family:Arial,Helvetica,sans-serif}
+    .title{font-size:14px;font-weight:bold}
+    .muted{fill:#777}
+    .btn{fill:#f5f5f5;stroke:#222}
+  </style>
+  <rect x="10" y="10" width="340" height="100" class="box"/>
+  <rect x="20" y="30" width="44" height="44" class="box"/>
+  <text x="72" y="44" class="label title">AppCard / 小程序名称</text>
+  <text x="72" y="62" class="label muted">描述（两行截断）</text>
+  <rect x="250" y="30" width="28" height="28" class="btn"/>
+  <text x="253" y="49" class="label">★</text>
+  <rect x="282" y="30" width="40" height="28" class="btn"/>
+  <text x="285" y="49" class="label">置顶</text>
+  <rect x="250" y="62" width="72" height="28" class="btn"/>
+  <text x="258" y="81" class="label">打开</text>
+  <text x="20" y="96" class="label muted">点击：优先直跳；否则二维码弹窗</text>
+</svg>

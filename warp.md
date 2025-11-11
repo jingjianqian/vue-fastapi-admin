@@ -1,18 +1,22 @@
-# vue-fastapi-admin — Warp Project Guide
+# WARP.md
 
-A full-stack admin starter combining FastAPI (Python 3.11) and Vue 3 + Vite + Naive UI. Includes RBAC, dynamic routes, and JWT auth. This guide summarizes how to run, build, lint, and develop the project quickly in Warp.
+This file provides guidance to WARP (warp.dev) when working with code in this repository.
+
+## Overview
+
+A full-stack admin platform combining FastAPI (Python 3.11) and Vue 3 + Vite + Naive UI with RBAC, dynamic routing, and JWT authentication.
 
 ## Stack
-- Backend: FastAPI, Tortoise ORM (SQLite by default), Aerich (migrations), Uvicorn
+- Backend: FastAPI, Tortoise ORM (MySQL by default), Aerich (migrations), Uvicorn
 - Frontend: Vue 3, Vite, Pinia, Vue Router, Naive UI, UnoCSS, Axios
 - Package managers: pnpm (recommended) or npm
-- Docker: Multi-stage build producing an Nginx + Python image exposing port 80
+- Docker: Multi-stage build producing Nginx + Python image on port 80
 
 ## Repository layout
 - Backend (Python): project root
   - Entrypoint: `run.py` (Uvicorn, port 9999, reload on dev)
   - App module: `app/` (routers, models, schemas, settings, init)
-  - Config: `app/settings/config.py` (SQLite default DB at `db.sqlite3`)
+  - Config: `app/settings/config.py` (**MySQL default**; SQLite available commented out)
   - Tooling: `pyproject.toml`, `requirements.txt`, `Makefile`
 - Frontend (Vue): `web/`
   - Entry: `web/src/main.js`
@@ -26,22 +30,31 @@ A full-stack admin starter combining FastAPI (Python 3.11) and Vue 3 + Vite + Na
 - Python 3.11+
 - Node.js 18.8.0+
 - pnpm (recommended): `npm i -g pnpm`
+- MySQL (or edit `app/settings/config.py` to use SQLite for local dev)
 
 ## Quick start
 ### Backend (dev)
-Option A: uv
-1) Create venv: `uv venv` and activate it
-2) Install deps: `uv add pyproject.toml`
-3) Run: `python run.py` (serves http://localhost:9999, OpenAPI at /docs)
+**Option A: uv (recommended)**
+```powershell
+pip install uv
+uv venv
+.\.venv\Scripts\activate  # Windows; use source .venv/bin/activate on Linux/Mac
+uv add pyproject.toml
+python run.py  # serves http://localhost:9999, OpenAPI at /docs
+```
 
-Option B: pip
-1) Create venv and activate
-2) `pip install -r requirements.txt`
-3) `python run.py`
+**Option B: pip**
+```powershell
+python -m venv venv
+.\venv\Scripts\activate  # Windows; use source venv/bin/activate on Linux/Mac
+pip install -r requirements.txt
+python run.py
+```
 
-Notes
+**Notes**
 - First run initializes DB, seeds superuser `admin`/`123456`, menus, roles, and APIs.
-- Default DB: SQLite file at `db.sqlite3`; adjust `TORTOISE_ORM` in `app/settings/config.py` to switch to MySQL/Postgres.
+- **Default DB: MySQL** (connection settings in `app/settings/config.py`)
+- To use SQLite locally: uncomment SQLite block and change `default_connection` to "sqlite" in `app/settings/config.py`
 
 ### Frontend (dev)
 1) `cd web`
@@ -93,27 +106,58 @@ Defaults
   - `VITE_COMPRESS_TYPE=gzip`
 
 ### Backend settings (app/settings/config.py)
-- CORS: allow all by default
-- JWT: HS256; default token lifetime 7 days (dev defaults only)
-- DB: SQLite; switch to MySQL/Postgres by uncommenting and configuring in `TORTOISE_ORM`
+- CORS: allow all by default (change for production)
+- JWT: HS256; default token lifetime 7 days
+- **DB: MySQL by default**; SQLite config is commented out (uncomment and switch for local dev)
+- **Never hardcode secrets** — use environment variables for production
 
 ## Routing and auth
-- Backend mounts routers under `/api` and versioned as `/api/v1`.
-- Frontend API module calls endpoints under `/base`, `/user`, `/role`, `/menu`, `/api`, `/dept`, `/auditlog` with base `/api/v1`.
-- Auth: JWT; login via `/api/v1/base/access_token`.
+- Backend mounts routers under `/api` and versioned as `/api/v1`
+- Frontend API module calls endpoints under `/base`, `/user`, `/role`, `/menu`, `/api`, `/dept`, `/auditlog`, `/wechat` with base `/api/v1`
+- **Auth**: JWT via `POST /api/v1/base/access_token`
+- **Token header**: Frontend sends token in header **"token"** (not "Authorization")
+- Permission checking: `DependPermission` validates user's role-bound APIs against method+path
+
+## High-level architecture
+
+### Backend (app/)
+- **App startup**: `app/__init__.py` creates FastAPI with middleware (CORS, background task, HTTP audit log) and lifespan that calls `init_data()`
+- **init_data()** sequence:
+  1. Runs DB migrations (Aerich)
+  2. Seeds admin user (admin/123456)
+  3. Seeds menus including wechat management
+  4. Collects API registry via `ApiController.refresh_api()`
+  5. Seeds roles and permissions
+- **Routing**:
+  - `/api/v1/base` — login, user info (no permission check)
+  - `/api/v1/user`, `/role`, `/menu`, `/api`, `/dept`, `/auditlog`, `/wechat` — require `DependPermission`
+- **Permission system**: `PermissionControl.has_permission()` validates JWT user's method+path against role-bound APIs
+- **API registry**: `ApiController.refresh_api()` scans FastAPI routes with dependencies, inserts/updates Api table, removes stale entries
+- **Models**: Tortoise ORM with User, Role, Menu, Api, Dept, AuditLog; many-to-many: roles ↔ menus, roles ↔ apis
+
+### Frontend (web/)
+- **HTTP client** (`web/src/utils/http/`):
+  - Axios wrapper with `baseURL` from `VITE_BASE_API`
+  - Attaches token in header **"token"** (except when `noNeedToken=true`)
+  - Interceptors: show errors, logout on 401
+- **Router**: Dynamic routes loaded after login; fetches user info, menus, accessible APIs; guards enforce auth
+- **Proxy**: Dev server proxies `/api/v1` to backend when `VITE_USE_PROXY=true`
 
 ## Common tasks
 - Change dev server port: edit `web/.env` → `VITE_PORT`
 - Change API base path: edit `web/.env.*` → `VITE_BASE_API`
-- Update DB engine: edit `app/settings/config.py` → `TORTOISE_ORM`
-- Reset local DB: `make clean-db` (removes migrations and sqlite files), then rerun
+- Switch DB to SQLite: edit `app/settings/config.py`, uncomment SQLite block, set `default_connection` to "sqlite"
+- Reset local DB: `make clean-db` (removes migrations and db files), then rerun
+- Add tests: Install pytest separately (not in requirements.txt), then use `make test`
 
-## Tips for Warp
-- Primary dev commands:
-  - Backend: `python run.py`
-  - Frontend: `cd web && pnpm dev`
-- Open API docs: http://localhost:9999/docs
-- Default admin for seeded data: `admin` / `123456` (change in production)
+## Important notes
+- **Database**: MySQL is the configured default (not SQLite); provide credentials or switch to SQLite for local dev
+- **Tests**: Makefile references pytest but it's not in `requirements.txt`; install separately if needed
+- **Token header**: Frontend uses header name "token" (not standard "Authorization")
+- **Default credentials**: admin/123456 (created on first run; **change for production**)
+- **Windows**: Commands shown use PowerShell syntax; Makefile may need adjustment for native Windows
 
----
-Generated by Agent Mode to speed up onboarding and command discovery.
+## Quick reference
+- **Backend**: `python run.py` → http://localhost:9999/docs
+- **Frontend**: `cd web && pnpm dev` → http://localhost:3100
+- **Docker**: `docker build --no-cache . -t vue-fastapi-admin && docker run -d -p 9999:80 vue-fastapi-admin`

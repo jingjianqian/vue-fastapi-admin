@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="360" height="300" viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .overlay{fill:rgba(0,0,0,0.4)}
+    .panel{fill:#fff;stroke:#222;stroke-width:1}
+    .label{font-size:12px;fill:#222;font-family:Arial,Helvetica,sans-serif}
+    .title{font-size:14px;font-weight:bold}
+    .btn{fill:#f5f5f5;stroke:#222}
+    .muted{fill:#777}
+  </style>
+  <rect x="0" y="0" width="360" height="300" fill="#eee"/>
+  <rect x="0" y="0" width="360" height="300" class="overlay"/>
+  <rect x="40" y="40" width="280" height="220" class="panel"/>
+  <text x="60" y="64" class="title">二维码弹窗（QrModal）</text>
+  <rect x="150" y="56" width="24" height="24" class="btn"/>
+  <text x="154" y="74" class="label">X</text>
+  <rect x="110" y="90" width="140" height="140" class="panel"/>
+  <text x="130" y="164" class="label">QR CODE</text>
+  <text x="60" y="242" class="label muted">长按识别二维码跳转</text>
+</svg>

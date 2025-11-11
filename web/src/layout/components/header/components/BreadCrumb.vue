@@ -1,8 +1,8 @@
 <template>
   <n-breadcrumb>
     <n-breadcrumb-item
-      v-for="item in route.matched.filter((item) => !!item.meta?.title)"
-      :key="item.path"
+      v-for="(item, index) in route.matched.filter((item) => !!item.meta?.title)"
+      :key="item.name || `${item.path}-${index}`"
       @click="handleBreadClick(item.path)"
     >
       <component :is="getIcon(item.meta)" />

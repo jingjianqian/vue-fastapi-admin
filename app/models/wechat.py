@@ -20,6 +20,11 @@ class WechatApp(BaseModel, TimestampMixin):
     version = fields.CharField(max_length=32, null=True, description="版本号", index=True)
     publish_status = fields.CharEnumField(PublishStatus, default=PublishStatus.DRAFT, description="发布状态", index=True)
     is_deleted = fields.BooleanField(default=False, description="是否删除标记", index=True)
+    
+    # 小程序端展示字段
+    category_id = fields.IntField(null=True, description="分类ID")
+    is_top = fields.BooleanField(default=False, description="后台置顶")
+    jump_path = fields.CharField(max_length=128, null=True, description="可选直跳路径")
 
     class Meta:
         table = "MyWechat"

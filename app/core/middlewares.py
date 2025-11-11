@@ -62,20 +62,24 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
 
         # 获取请求体
         if request.method in ["POST", "PUT", "PATCH"]:
-            try:
-                body = await request.json()
-                args.update(body)
-            except json.JSONDecodeError:
+            content_type = request.headers.get("content-type", "")
+            
+            # 先检查 Content-Type，避免对 multipart 数据调用 json()
+            if "application/json" in content_type:
+                try:
+                    body = await request.json()
+                    args.update(body)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    pass
+            elif "multipart/form-data" in content_type:
+                # 对于文件上传，不读取请求体，由路由处理器处理
+                # 只记录提示信息
+                args["_note"] = "multipart file upload"
+            elif "application/x-www-form-urlencoded" in content_type:
                 try:
                     body = await request.form()
-                    # args.update(body)
                     for k, v in body.items():
-                        if hasattr(v, "filename"):  # 文件上传行为
-                            args[k] = v.filename
-                        elif isinstance(v, list) and v and hasattr(v[0], "filename"):
-                            args[k] = [file.filename for file in v]
-                        else:
-                            args[k] = v
+                        args[k] = v
                 except Exception:
                     pass
 
@@ -163,12 +167,18 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
             for path in self.exclude_paths:
                 if re.search(path, request.url.path, re.I) is not None:
                     return
-            data: dict = await self.get_request_log(request=request, response=response)
-            data["response_time"] = process_time
+            try:
+                data: dict = await self.get_request_log(request=request, response=response)
+                data["response_time"] = process_time
 
-            data["request_args"] = request.state.request_args
-            data["response_body"] = await self.get_response_body(request, response)
-            await AuditLog.create(**data)
+                data["request_args"] = request.state.request_args
+                data["response_body"] = await self.get_response_body(request, response)
+                await AuditLog.create(**data)
+            except Exception as e:
+                # 容错处理：如果审计日志写入失败，不影响业务请求
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Audit log creation failed: {e}")
 
         return response
 

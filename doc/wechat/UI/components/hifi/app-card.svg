@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="360" height="140" viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .card{fill:#FFFFFF;stroke:#E5E6EB}
+      .text{font:500 14px 'Segoe UI',Arial; fill:#1D2129}
+      .muted{font:400 12px 'Segoe UI',Arial; fill:#86909C}
+      .btn{fill:#07C160}
+      .btnText{font:600 12px 'Segoe UI',Arial; fill:#fff}
+      .small{font:400 11px 'Segoe UI',Arial; fill:#A1A7B3}
+      .tag{fill:#E8F7F0;stroke:#07C160}
+      .tagText{font:600 10px 'Segoe UI',Arial; fill:#07C160}
+      .shadow{filter:url(#s)}
+    </style>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="340" height="120" rx="12" class="card shadow"/>
+  <rect x="24" y="36" width="56" height="56" rx="12" fill="#F2F3F5"/>
+  <text x="90" y="56" class="text">组件 · AppCard</text>
+  <text x="90" y="76" class="muted">两行描述，展示副标题与摘要信息</text>
+  <rect x="90" y="92" width="38" height="16" rx="8" class="tag"/>
+  <text x="97" y="104" class="tagText">置顶</text>
+  <!-- 收藏星 -->
+  <polygon points="318,40 322,52 335,52 324,60 328,72 318,65 308,72 312,60 301,52 314,52" fill="#FFC53D" stroke="#D48806"/>
+  <!-- 打开按钮 -->
+  <rect x="260" y="90" width="76" height="26" rx="6" class="btn"/>
+  <text x="286" y="107" class="btnText">打开</text>
+  <text x="24" y="120" class="small">点击卡片优先直跳，失败则弹二维码</text>
+</svg>

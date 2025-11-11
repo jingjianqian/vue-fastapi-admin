@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="360" height="96" viewBox="0 0 360 96" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bar{fill:#F2F3F5;stroke:#E5E6EB}
+      .muted{font:400 12px 'Segoe UI',Arial; fill:#86909C}
+      .text{font:500 14px 'Segoe UI',Arial; fill:#1D2129}
+      .chip{fill:#FFFFFF;stroke:#E5E6EB}
+    </style>
+  </defs>
+  <text x="16" y="20" class="text">SearchBar（吸顶样式）</text>
+  <rect x="16" y="28" width="328" height="36" rx="18" class="bar"/>
+  <!-- magnifier icon -->
+  <circle cx="36" cy="46" r="8" stroke="#C9CDD4" stroke-width="2" fill="none"/>
+  <line x1="42" y1="52" x2="48" y2="58" stroke="#C9CDD4" stroke-width="2"/>
+  <text x="60" y="50" class="muted">搜索小程序、分类或功能</text>
+  <rect x="310" y="34" width="28" height="24" rx="6" class="chip"/>
+  <line x1="318" y1="40" x2="330" y2="52" stroke="#86909C"/>
+  <line x1="330" y1="40" x2="318" y2="52" stroke="#86909C"/>
+</svg>

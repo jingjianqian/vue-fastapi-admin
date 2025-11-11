@@ -21,6 +21,17 @@ async function setupApp() {
   app.use(useResize)
   app.use(i18n)
   app.mount('#app')
+  
+  // 调试：将 app 和 store 暴露到 window 对象
+  if (import.meta.env.DEV) {
+    window.__APP__ = app
+    // 通过 _context 访问 pinia
+    const appContext = app._context
+    window.__PINIA__ = appContext?.config?.globalProperties?.$pinia || appContext?.provides?.pinia
+    // 直接暴露 router
+    window.__ROUTER__ = appContext?.config?.globalProperties?.$router
+    console.log('[Debug] window.__APP__, __PINIA__, __ROUTER__ 已暴露')
+  }
 }
 
 setupApp()
