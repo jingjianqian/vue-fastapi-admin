@@ -1,3 +1,4 @@
-from .manager import CrawlerManager
-
-__all__ = ["CrawlerManager"]
+"""
+空的爬虫模块占位。
+后续将基于 DrissionPage 实现浏览器采集能力。
+"""

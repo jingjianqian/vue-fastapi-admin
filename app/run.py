@@ -1,7 +1,12 @@
+import asyncio
+import sys
 import uvicorn
 from uvicorn.config import LOGGING_CONFIG
 
 if __name__ == "__main__":
+    # Windows 平台：为支持 asyncio 子进程，应使用 SelectorEventLoop
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     # 修改默认日志配置
     LOGGING_CONFIG["formatters"]["default"]["fmt"] = "%(asctime)s - %(levelname)s - %(message)s"
     LOGGING_CONFIG["formatters"]["default"]["datefmt"] = "%Y-%m-%d %H:%M:%S"

@@ -2,4 +2,4 @@
 from .admin import *
 from .wechat import *
 from .wxapp_extra import *
-from .crawler import *
+from .script import *

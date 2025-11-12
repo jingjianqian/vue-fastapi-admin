@@ -22,7 +22,7 @@ v1_router.include_router(apis_router, prefix="/api", dependencies=[DependPermiss
 v1_router.include_router(depts_router, prefix="/dept", dependencies=[DependPermission])
 v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[DependPermission])
 v1_router.include_router(wechat_router, prefix="/wechat", dependencies=[DependPermission])
-# 爬虫管理（仅管理端可用）
+# 爬虫脚本平台（脚本编写/运行/依赖管理）
 from .crawler import crawler_router
 v1_router.include_router(crawler_router, prefix="/crawler", dependencies=[DependPermission])
 # wxapp 面向小程序端，GET 匿名可读，写接口内部做鉴权

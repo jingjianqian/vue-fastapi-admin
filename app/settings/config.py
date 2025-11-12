@@ -97,6 +97,24 @@ class Settings(BaseSettings):
         "timezone": "Asia/Shanghai",  # Timezone setting
     }
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
+    
+    # 小程序配置（从环境变量读取）
+    WXAPP_APPID: str = ""
+    WXAPP_SECRET: str = ""
+    WXAPP_API_KEY: str = ""
+    WXAPP_API_SECRET: str = ""
+    
+    # 微信API配置
+    WX_CODE2SESSION_URL: str = "https://api.weixin.qq.com/sns/jscode2session"
+    WX_API_TIMEOUT: int = 10  # 微信API超时时间（秒）
+    
+    # 频率限制配置
+    WXAPP_RATE_LIMIT_PER_MINUTE: int = 60
+    WXAPP_RATE_LIMIT_PER_HOUR: int = 1000
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
 
 settings = Settings()

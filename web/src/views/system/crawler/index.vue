@@ -1,188 +1,346 @@
 <script setup>
-import { h, ref } from 'vue'
-import { NButton, NForm, NFormItem, NInput, NInputNumber, NSelect, NSwitch, NTag } from 'naive-ui'
-
+import { h, ref, onMounted, onUnmounted } from 'vue'
+import { NButton, NForm, NFormItem, NInput, NInputNumber, NList, NListItem, NCard, NModal, NTag, NSpin, NDivider, NSwitch } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
-import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
 import CrudModal from '@/components/table/CrudModal.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
-
 import api from '@/api'
 
 const tableRef = ref(null)
+const scripts = ref([])
+const total = ref(0)
+const pagination = ref({ page: 1, pageSize: 10 })
 
-const sourceOptions = [
-  { label: 'we123_miniprogram', value: 'we123_miniprogram' },
-]
-
-const queryItems = ref({ status: null, source: null })
-
-const createVisible = ref(false)
-const createLoading = ref(false)
-const createForm = ref({
-  name: '',
-  source: 'we123_miniprogram',
-  start_id: 1,
-  is_loop: false,
-  max_consecutive_404: 500,
-  concurrency: 1,
-  delay_ms: 0,
-  max_retries: 1,
-  proxy: '',
-})
-
+const current = ref(null)
+const editor = ref({ id: 0, name: '', desc: '', code: "print('hello world')\n", requirements: '', enabled: true })
 const editVisible = ref(false)
 const editLoading = ref(false)
-const editForm = ref({ id: 0, is_loop: false, max_consecutive_404: 500, concurrency: 1, delay_ms: 0, max_retries: 1, proxy: '' })
 
-const columns = [
-  { title: 'ID', key: 'id', width: 80, align: 'center' },
-  { title: '名称', key: 'name', width: 180, align: 'center', ellipsis: { tooltip: true } },
-  { title: '来源', key: 'source', width: 160, align: 'center' },
-  { title: '状态', key: 'status', width: 120, align: 'center', render(row) {
-    const map = { idle: 'default', running: 'success', stopped: 'warning', finished: 'info', error: 'error' }
-    return h(NTag, { type: map[row.status] || 'default' }, { default: () => row.status })
-  } },
-  { title: '起始ID', key: 'start_id', width: 90, align: 'center' },
-  { title: '下一ID', key: 'next_id', width: 90, align: 'center' },
-  { title: '404计数', key: 'consecutive_404', width: 90, align: 'center' },
-  { title: '404阈值', key: 'max_consecutive_404', width: 90, align: 'center' },
-  { title: '并发', key: 'concurrency', width: 80, align: 'center' },
-  { title: '延迟ms', key: 'delay_ms', width: 90, align: 'center' },
-  { title: '重试', key: 'max_retries', width: 80, align: 'center' },
-  { title: '代理', key: 'proxy', width: 180, align: 'center', ellipsis: { tooltip: true } },
-  { title: '最后运行', key: 'last_run_at', width: 170, align: 'center' },
-  { title: '操作', key: 'actions', width: 240, align: 'center', fixed: 'right', render(row) {
-    return [
-      h(NButton, { size: 'small', type: 'success', style: 'margin-right: 8px;', onClick: () => handleStart(row) }, { default: () => '启动', icon: () => h(TheIcon, { icon: 'mdi:play' }) }),
-      h(NButton, { size: 'small', type: 'warning', style: 'margin-right: 8px;', onClick: () => handleStop(row) }, { default: () => '停止', icon: () => h(TheIcon, { icon: 'mdi:stop' }) }),
-      h(NButton, { size: 'small', type: 'primary', onClick: () => openEdit(row) }, { default: () => '配置', icon: () => h(TheIcon, { icon: 'material-symbols:settings' }) }),
-    ]
-  }},
-]
+const runLoading = ref(false)
+const lastRun = ref(null)
+const logs = ref({ stdout: '', stderr: '' })
 
-async function getList(params) {
-  const res = await api.getCrawlerTasks(params)
-  return res
-}
+const settings = ref({ retention_days: 30, default_timeout_sec: 600, max_log_bytes: 1048576 })
 
-function handleAdd() {
-  createVisible.value = true
-}
+// we123
+const we123Cfg = ref({ start_id: 1, loop: false, max_404_span: 500, delay_sec: 3, ua: '', proxy: '' })
+const we123Status = ref(null)
+const we123XpathsText = ref('')
+const we123Loading = ref(false)
 
-async function handleCreate() {
-  try {
-    createLoading.value = true
-    const payload = { ...createForm.value }
-    if (!payload.proxy) delete payload.proxy
-    await api.createCrawlerTask(payload)
-    window.$message.success('创建成功')
-    createVisible.value = false
-    tableRef.value?.handleSearch()
-  } finally {
-    createLoading.value = false
+// pip
+const pipList = ref([])
+const pipQuery = ref('')
+const pipInfo = ref(null)
+const pipLoading = ref(false)
+
+async function fetchList () {
+  if (tableRef.value?.handleSearch) {
+    await tableRef.value.handleSearch()
   }
 }
 
-async function handleStart(row) {
-  await api.startCrawlerTask({ id: row.id })
-  window.$message.success('已启动')
-  tableRef.value?.handleSearch()
-}
+let we123Timer = null
+onMounted(async () => {
+  await fetchList()
+  const s = await api.crawlerSettingsGet()
+  settings.value = s.data
+  await refreshPip()
+  // we123 init
+  try { await fetchWe123Status(); } catch (e) {}
+  try { await fetchWe123Xpaths(); } catch (e) {}
+  we123Timer = setInterval(() => {
+    fetchWe123Status().catch(() => {})
+  }, 10000)
+})
+onUnmounted(() => { if (we123Timer) { clearInterval(we123Timer); we123Timer = null } })
 
-async function handleStop(row) {
-  await api.stopCrawlerTask({ id: row.id })
-  window.$message.success('已停止')
-  tableRef.value?.handleSearch()
-}
-
-function openEdit(row) {
-  editForm.value = {
-    id: row.id,
-    is_loop: row.is_loop,
-    max_consecutive_404: row.max_consecutive_404,
-    concurrency: row.concurrency,
-    delay_ms: row.delay_ms,
-    max_retries: row.max_retries,
-    proxy: row.proxy || '',
-  }
+function openCreate () {
+  editor.value = { id: 0, name: '', desc: '', code: "print('hello world')\n", requirements: '', enabled: true }
   editVisible.value = true
 }
 
-async function handleUpdate() {
+async function openEdit (row) {
+  const res = await api.crawlerScriptGet({ id: row.id })
+  editor.value = res.data
+  editVisible.value = true
+}
+
+async function saveScript () {
   try {
     editLoading.value = true
-    const payload = { ...editForm.value }
-    if (!payload.proxy) payload.proxy = null
-    await api.updateCrawlerTask(payload)
-    window.$message.success('已更新')
+if (editor.value.id) {
+      await api.crawlerScriptUpdate(editor.value)
+    } else {
+      const ret = await api.crawlerScriptCreate(editor.value)
+      editor.value.id = ret.data?.id
+    }
+    window.$message.success('已保存')
     editVisible.value = false
-    tableRef.value?.handleSearch()
+    await fetchList()
   } finally {
     editLoading.value = false
   }
 }
 
-async function handleSync() {
-  await api.syncOdsToWechat({ only_new: true, overwrite: false, include_no_appid: false, limit: 500 })
-  window.$message.success('ODS 同步完成')
+async function removeScript (row) {
+  await api.crawlerScriptDelete({ id: row.id })
+  window.$message.success('已删除')
+  await fetchList()
+}
+
+async function runScript (row) {
+  try {
+    runLoading.value = true
+    const ret = await api.crawlerScriptRun({ id: row.id })
+    lastRun.value = { id: ret.data?.run_id, status: ret.data?.status }
+    await pollLogsUntilDone()
+  } finally {
+    runLoading.value = false
+  }
+}
+
+async function refreshLogs () {
+  if (!lastRun.value?.id) return
+  try {
+    const st = await api.crawlerScriptRunStatus({ run_id: lastRun.value.id })
+    const lg = await api.crawlerScriptRunLogs({ run_id: lastRun.value.id })
+    lastRun.value = st.data
+    logs.value = lg.data
+  } catch (e) {
+    // 忽略一次错误，避免打断轮询
+  }
+}
+
+// pip
+async function refreshPip () {
+  pipLoading.value = true
+  try {
+    const r = await api.crawlerPipList()
+    pipList.value = r.data || []
+  } finally {
+    pipLoading.value = false
+  }
+}
+
+async function pipSearch () {
+  if (!pipQuery.value) { pipInfo.value = null; return }
+  pipLoading.value = true
+  try {
+    const r = await api.crawlerPipShow({ name: pipQuery.value })
+    pipInfo.value = r.data
+  } catch (e) {
+    pipInfo.value = null
+  } finally {
+    pipLoading.value = false
+  }
+}
+
+async function pipInstall (name) {
+  pipLoading.value = true
+  try {
+    await api.crawlerPipInstall({ name })
+    window.$message.success('安装完成（请检查日志）')
+    await refreshPip()
+  } finally {
+    pipLoading.value = false
+  }
+}
+
+async function saveSettings () {
+  await api.crawlerSettingsUpdate(settings.value)
+  window.$message.success('设置已更新')
+}
+
+// we123 apis
+async function fetchWe123Status () {
+  const r = await api.we123Status()
+  we123Status.value = r.data
+}
+async function fetchWe123Xpaths () {
+  const r = await api.we123GetXpaths()
+  we123XpathsText.value = JSON.stringify(r.data || {}, null, 2)
+}
+async function saveWe123Xpaths () {
+  try {
+    const payload = JSON.parse(we123XpathsText.value || '{}')
+    await api.we123UpdateXpaths(payload)
+    window.$message.success('XPath 已更新')
+  } catch (e) {
+    window.$message.error('JSON 解析失败，请检查格式')
+  }
+}
+async function startWe123 () {
+  try {
+    we123Loading.value = true
+    const payload = { ...we123Cfg.value }
+    // 清理空字符串为 null
+    if (!payload.ua) payload.ua = null
+    if (!payload.proxy) payload.proxy = null
+    await api.we123Start(payload)
+    window.$message.success('任务已启动')
+    await fetchWe123Status()
+  } finally {
+    we123Loading.value = false
+  }
+}
+async function stopWe123 () {
+  try {
+    we123Loading.value = true
+    await api.we123Stop()
+    window.$message.success('任务已停止')
+    await fetchWe123Status()
+  } finally {
+    we123Loading.value = false
+  }
+}
+async function pollLogsUntilDone () {
+  // 最多轮询 30 次（约 30 秒），直到状态不是 running/queued
+  for (let i = 0; i < 30; i++) {
+    await refreshLogs()
+    const st = lastRun.value?.status
+    if (st && st !== 'running' && st !== 'queued') {
+      break
+    }
+    await new Promise(r => setTimeout(r, 1000))
+  }
 }
 </script>
 
 <template>
-  <CommonPage show-footer title="爬虫管理">
+  <CommonPage show-footer title="脚本爬虫平台">
     <template #action>
-      <NButton type="primary" @click="handleAdd">
-        <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建任务
-      </NButton>
-      <NButton class="ml-10" @click="handleSync">
-        <TheIcon icon="mdi:database-sync-outline" :size="18" class="mr-5" />ODS→小程序 同步
-      </NButton>
+      <NButton type="primary" @click="openCreate"><TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建脚本</NButton>
+      <NButton class="ml-10" @click="fetchList"><TheIcon icon="mdi:refresh" :size="18" class="mr-5" />刷新</NButton>
     </template>
 
-    <CrudTable ref="tableRef" :columns="columns" :query-items="queryItems" :get-data="getList" :scroll-x="1700">
-      <template #queryBar>
-        <QueryBarItem label="来源">
-          <NSelect v-model:value="queryItems.source" :options="sourceOptions" clearable :to="'body'" />
-        </QueryBarItem>
-        <QueryBarItem label="状态">
-          <NSelect v-model:value="queryItems.status" :options="[
-            { label: 'idle', value: 'idle' },
-            { label: 'running', value: 'running' },
-            { label: 'stopped', value: 'stopped' },
-            { label: 'finished', value: 'finished' },
-            { label: 'error', value: 'error' },
-          ]" clearable :to="'body'" />
-        </QueryBarItem>
-      </template>
-    </CrudTable>
+    <div class="grid" style="display:grid;grid-template-columns: 1fr 1fr;grid-gap:12px;">
+      <NCard title="脚本列表">
+<CrudTable ref="tableRef" :columns="[
+          { title: 'ID', key: 'id', width: 80, align: 'center' },
+          { title: '名称', key: 'name' },
+          { title: '启用', key: 'enabled', render(row){ return h(NTag, { type: row.enabled ? 'success' : 'default' }, { default: () => row.enabled ? '是' : '否' }) } },
+          { title: '更新时间', key: 'updated_at' },
+          { title: '操作', key: 'actions', width: 260, align: 'center', render(row){
+            return [
+              h(NButton, { size: 'small', type: 'success', style: 'margin-right:8px;', onClick: ()=>runScript(row) }, { default: ()=>'运行', icon: ()=>h(TheIcon, { icon:'mdi:play' }) }),
+              h(NButton, { size: 'small', type: 'primary', style: 'margin-right:8px;', onClick: ()=>openEdit(row) }, { default: ()=>'编辑', icon: ()=>h(TheIcon, { icon:'material-symbols:edit' }) }),
+              h(NButton, { size: 'small', type: 'error', onClick: ()=>removeScript(row) }, { default: ()=>'删除', icon: ()=>h(TheIcon, { icon:'mdi:delete' }) }),
+            ]
+          }}
+        ]" :get-data="async ({ page, pageSize })=>{ pagination.page=page; pagination.pageSize=pageSize; const r=await api.crawlerScriptList({ page, page_size: pageSize }); return r }" />
+      </NCard>
+
+      <NCard title="运行与日志" :segmented="{content:true,footer:true}">
+        <template #header-extra>
+          <NButton size="small" @click="refreshLogs">刷新日志</NButton>
+        </template>
+        <NSpin :show="runLoading">
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;">
+              <div style="font-weight:600">STDOUT</div>
+              <pre style="white-space:pre-wrap;max-height:300px;overflow:auto">{{ logs.stdout }}</pre>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600">STDERR</div>
+              <pre style="white-space:pre-wrap;max-height:300px;overflow:auto;color:#c00">{{ logs.stderr }}</pre>
+            </div>
+          </div>
+        </NSpin>
+        <template #footer>
+<div>状态：{{ (lastRun && lastRun.status) || '-' }}，用时：{{ (lastRun && lastRun.duration_ms) || '-' }}ms</div>
+        </template>
+      </NCard>
+    </div>
+
+    <NDivider />
+    <div class="grid" style="display:grid;grid-template-columns: 2fr 1fr;grid-gap:12px;">
+      <NCard title="依赖管理">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <NInput v-model:value="pipQuery" placeholder="输入包名，如 requests" style="max-width:320px" />
+          <NButton @click="pipSearch">搜索</NButton>
+          <NButton tertiary @click="refreshPip">刷新已安装</NButton>
+        </div>
+        <NSpin :show="pipLoading">
+          <div v-if="pipInfo" class="mt-10">
+            <div style="font-weight:600">{{ pipInfo.name }} <NTag type="info">{{ pipInfo.version }}</NTag></div>
+            <div class="mt-5" style="color:#888">{{ pipInfo.summary }}</div>
+            <div class="mt-5">
+              <NButton size="small" type="primary" @click="pipInstall(pipInfo.name)">安装/升级</NButton>
+            </div>
+          </div>
+          <NDivider />
+          <div>
+            <div style="font-weight:600">已安装</div>
+            <ul>
+              <li v-for="p in pipList" :key="p.name">{{ p.name }} <NTag size="small">{{ p.version }}</NTag></li>
+            </ul>
+          </div>
+        </NSpin>
+      </NCard>
+
+      <NCard title="平台设置">
+        <NForm :model="settings" label-placement="left" :label-width="130">
+          <NFormItem label="日志保留天数"><NInputNumber v-model:value="settings.retention_days" :min="1" :max="365" /></NFormItem>
+          <NFormItem label="默认超时(秒)"><NInputNumber v-model:value="settings.default_timeout_sec" :min="10" :max="86400" /></NFormItem>
+          <NFormItem label="日志最大字节"><NInputNumber v-model:value="settings.max_log_bytes" :min="1024" :max="10485760" /></NFormItem>
+          <NButton type="primary" @click="saveSettings">保存设置</NButton>
+        </NForm>
+      </NCard>
+    </div>
+
+    <NDivider />
+    <NCard title="we123 爬虫">
+      <NSpin :show="we123Loading">
+        <div style="display:grid;grid-template-columns: 1fr 1fr;gap:12px;align-items:start;">
+          <div>
+            <NForm :model="we123Cfg" label-placement="left" :label-width="130">
+              <NFormItem label="起始ID"><NInputNumber v-model:value="we123Cfg.start_id" :min="1" /></NFormItem>
+              <NFormItem label="循环模式"><NSwitch v-model:value="we123Cfg.loop" /></NFormItem>
+              <NFormItem label="连续404阈值"><NInputNumber v-model:value="we123Cfg.max_404_span" :min="10" :max="100000" /></NFormItem>
+              <NFormItem label="最小间隔(秒)"><NInputNumber v-model:value="we123Cfg.delay_sec" :min="1" :max="60" :step="0.5" /></NFormItem>
+              <NFormItem label="User-Agent"><NInput v-model:value="we123Cfg.ua" placeholder="可留空使用默认" /></NFormItem>
+              <NFormItem label="代理"><NInput v-model:value="we123Cfg.proxy" placeholder="http://host:port 或鉴权代理" /></NFormItem>
+              <div>
+                <NButton type="primary" :disabled="we123Status?.running" @click="startWe123">启动</NButton>
+                <NButton class="ml-10" type="warning" :disabled="!we123Status?.running" @click="stopWe123">停止</NButton>
+                <NButton class="ml-10" @click="fetchWe123Status">刷新状态</NButton>
+              </div>
+            </NForm>
+            <div class="mt-10">
+              <div style="font-weight:600">当前状态</div>
+              <ul style="line-height:1.8">
+                <li>运行中：{{ we123Status?.running ? '是' : '否' }}</li>
+                <li>last_id：{{ we123Status?.last_id ?? '-' }}</li>
+                <li>last_ok_id：{{ we123Status?.last_ok_id ?? '-' }}</li>
+                <li>连续404：{{ we123Status?.consecutive_404 ?? 0 }}</li>
+                <li>成功/404/错误：{{ we123Status?.ok_count ?? 0 }} / {{ we123Status?.not_found_count ?? 0 }} / {{ we123Status?.error_count ?? 0 }}</li>
+                <li>最近错误：{{ we123Status?.last_error || '-' }}</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-weight:600">XPath 配置（JSON）</div>
+              <div>
+                <NButton size="small" type="primary" @click="saveWe123Xpaths">保存</NButton>
+                <NButton size="small" class="ml-10" @click="fetchWe123Xpaths">重置</NButton>
+              </div>
+            </div>
+            <NInput v-model:value="we123XpathsText" type="textarea" :rows="16" placeholder='{"name":"//h1/text()", ...}' />
+          </div>
+        </div>
+      </NSpin>
+    </NCard>
+
+    <CrudModal v-model:visible="editVisible" title="编辑脚本" :loading="editLoading" @save="saveScript" width="900px">
+      <NForm :model="editor" label-placement="left" :label-width="100">
+        <NFormItem label="名称"><NInput v-model:value="editor.name" /></NFormItem>
+        <NFormItem label="描述"><NInput v-model:value="editor.desc" /></NFormItem>
+        <NFormItem label="代码"><NInput v-model:value="editor.code" type="textarea" :rows="12" /></NFormItem>
+        <NFormItem label="依赖"><NInput v-model:value="editor.requirements" type="textarea" :rows="4" placeholder="每行一个包名，可留空" /></NFormItem>
+      </NForm>
+    </CrudModal>
   </CommonPage>
-
-  <!-- 创建 -->
-  <CrudModal v-model:visible="createVisible" title="创建任务" :loading="createLoading" @save="handleCreate" width="700px">
-    <NForm :model="createForm" label-placement="left" :label-width="130">
-      <NFormItem label="任务名称"><NInput v-model:value="createForm.name" placeholder="例如：we123全量" /></NFormItem>
-      <NFormItem label="来源"><NSelect v-model:value="createForm.source" :options="sourceOptions" :to="'body'" /></NFormItem>
-      <NFormItem label="起始ID"><NInputNumber v-model:value="createForm.start_id" :min="1" /></NFormItem>
-      <NFormItem label="循环"><NSwitch v-model:value="createForm.is_loop" /></NFormItem>
-      <NFormItem label="404阈值"><NInputNumber v-model:value="createForm.max_consecutive_404" :min="1" :max="10000" /></NFormItem>
-      <NFormItem label="并发"><NInputNumber v-model:value="createForm.concurrency" :min="1" :max="8" /></NFormItem>
-      <NFormItem label="延迟(ms)"><NInputNumber v-model:value="createForm.delay_ms" :min="0" :max="60000" /></NFormItem>
-      <NFormItem label="重试次数"><NInputNumber v-model:value="createForm.max_retries" :min="1" :max="5" /></NFormItem>
-      <NFormItem label="代理"><NInput v-model:value="createForm.proxy" placeholder="http://host:port，可留空" /></NFormItem>
-    </NForm>
-  </CrudModal>
-
-  <!-- 配置 -->
-  <CrudModal v-model:visible="editVisible" title="编辑配置" :loading="editLoading" @save="handleUpdate" width="700px">
-    <NForm :model="editForm" label-placement="left" :label-width="130">
-      <NFormItem label="循环"><NSwitch v-model:value="editForm.is_loop" /></NFormItem>
-      <NFormItem label="404阈值"><NInputNumber v-model:value="editForm.max_consecutive_404" :min="1" :max="10000" /></NFormItem>
-      <NFormItem label="并发"><NInputNumber v-model:value="editForm.concurrency" :min="1" :max="8" /></NFormItem>
-      <NFormItem label="延迟(ms)"><NInputNumber v-model:value="editForm.delay_ms" :min="0" :max="60000" /></NFormItem>
-      <NFormItem label="重试次数"><NInputNumber v-model:value="editForm.max_retries" :min="1" :max="5" /></NFormItem>
-      <NFormItem label="代理"><NInput v-model:value="editForm.proxy" placeholder="http://host:port，可留空" /></NFormItem>
-    </NForm>
-  </CrudModal>
 </template>

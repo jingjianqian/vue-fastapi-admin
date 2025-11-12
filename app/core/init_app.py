@@ -246,60 +246,87 @@ async def ensure_wechat_menu():
             await user.apis.add(*user_readonly_apis)
 
 
-async def ensure_crawler_menu():
-    # 刷新API，确保 /api/v1/crawler/* 被收集
-    try:
-        from app.controllers.api import api_controller
-        await api_controller.refresh_api()
-    except Exception:
-        pass
-
-    # 已存在则跳过
-    exist = await Menu.filter(component="/system/crawler").exists()
-    if exist:
-        return
-    # 找到系统管理父级
-    parent = await Menu.filter(path="/system", parent_id=0).first()
-    if not parent:
-        parent = await Menu.create(
-            menu_type=MenuType.CATALOG,
-            name="系统管理",
-            path="/system",
-            order=1,
-            parent_id=0,
-            icon="carbon:gui-management",
-            is_hidden=False,
-            component="Layout",
-            keepalive=False,
-            redirect="/system/user",
-        )
-    menu = await Menu.create(
-        menu_type=MenuType.MENU,
-        name="爬虫管理",
-        path="crawler",
-        order=8,
-        parent_id=parent.id,
-        icon="mdi:spider",
-        is_hidden=False,
-        component="/system/crawler",
-        keepalive=False,
-    )
-    # 赋权给管理员角色
-    admin = await Role.filter(name="管理员").first()
-    if admin:
-        await admin.menus.add(menu)
-
-    # 追加API权限：将 /api/v1/crawler/* 授权给管理员
-    from app.models.admin import Api as ApiModel
-    crawler_apis = await ApiModel.filter(path__startswith="/api/v1/crawler").all()
-    if admin and crawler_apis:
-        await admin.apis.add(*crawler_apis)
 
 
 async def init_apis():
     apis = await api_controller.model.exists()
     if not apis:
         await api_controller.refresh_api()
+
+
+async def ensure_crawler_api_permissions():
+    # 刷新API，确保 /api/v1/crawler/* 被收集
+    try:
+        await api_controller.refresh_api()
+    except Exception:
+        pass
+    # 为管理员角色赋予 /api/v1/crawler/* 接口权限
+    from app.models.admin import Api as ApiModel
+    admin = await Role.filter(name="管理员").first()
+    if not admin:
+        return
+    crawler_apis = await ApiModel.filter(path__startswith="/api/v1/crawler").all()
+    if crawler_apis:
+        await admin.apis.add(*crawler_apis)
+
+
+async def ensure_we123_scripts():
+    """创建 we123 启停脚本（用于 UI 脚本平台一键调用任务 API）。"""
+    try:
+        from app.models.script import Script
+        # 启动脚本
+        name_start = "we123 启动器"
+        exist = await Script.filter(name=name_start).exists()
+        if not exist:
+            code_start = (
+                "import json, urllib.request\n"
+                "def _post(url, data, token=None):\n"
+                "  req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type':'application/json'})\n"
+                "  if token: req.add_header('token', token)\n"
+                "  with urllib.request.urlopen(req, timeout=10) as resp:\n"
+                "    return json.loads(resp.read().decode('utf-8','ignore'))\n"
+                "def _login(base):\n"
+                "  data={'username':'admin','password':'123456'}\n"
+                "  r=_post(base+'/api/v1/base/access_token', data)\n"
+                "  return (r.get('data') or {}).get('access_token')\n"
+                "def main():\n"
+                "  base='http://127.0.0.1:9999'\n"
+                "  token=_login(base)\n"
+                "  payload={'start_id':1,'loop':False,'max_404_span':500,'delay_sec':3}\n"
+                "  r=_post(base+'/api/v1/crawler/task/we123/start', payload, token)\n"
+                "  print(json.dumps(r, ensure_ascii=False))\n"
+                "if __name__=='__main__':\n"
+                "  main()\n"
+            )
+            await Script.create(name=name_start, desc="启动 we123 爬虫任务", code=code_start, enabled=True)
+        # 停止脚本
+        name_stop = "we123 停止器"
+        exist2 = await Script.filter(name=name_stop).exists()
+        if not exist2:
+            code_stop = (
+                "import json, urllib.request\n"
+                "def _post(url, data=None, token=None):\n"
+                "  if data is None: data={}\n"
+                "  req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type':'application/json'})\n"
+                "  if token: req.add_header('token', token)\n"
+                "  with urllib.request.urlopen(req, timeout=10) as resp:\n"
+                "    return json.loads(resp.read().decode('utf-8','ignore'))\n"
+                "def _login(base):\n"
+                "  data={'username':'admin','password':'123456'}\n"
+                "  r=_post(base+'/api/v1/base/access_token', data)\n"
+                "  return (r.get('data') or {}).get('access_token')\n"
+                "def main():\n"
+                "  base='http://127.0.0.1:9999'\n"
+                "  token=_login(base)\n"
+                "  r=_post(base+'/api/v1/crawler/task/we123/stop', {}, token)\n"
+                "  print(json.dumps(r, ensure_ascii=False))\n"
+                "if __name__=='__main__':\n"
+                "  main()\n"
+            )
+            await Script.create(name=name_stop, desc="停止 we123 爬虫任务", code=code_stop, enabled=True)
+    except Exception:
+        # 不阻断启动流程
+        pass
 
 
 async def init_db():
@@ -350,6 +377,7 @@ async def init_data():
     await init_superuser()
     await init_menus()
     await ensure_wechat_menu()
-    await ensure_crawler_menu()
     await init_apis()
+    await ensure_crawler_api_permissions()
+    await ensure_we123_scripts()
     await init_roles()

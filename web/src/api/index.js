@@ -54,12 +54,28 @@ export default {
   }),
   restoreWechat: (data = {}) => request.post('/wechat/restore', data),
 
-  // crawler management
-  getCrawlerTasks: (params = {}) => request.get('/crawler/task/list', { params }),
-  createCrawlerTask: (data = {}) => request.post('/crawler/task/create', data),
-  startCrawlerTask: (data = {}) => request.post('/crawler/task/start', data),
-  stopCrawlerTask: (data = {}) => request.post('/crawler/task/stop', data),
-  getCrawlerTaskStatus: (params = {}) => request.get('/crawler/task/status', { params }),
-  updateCrawlerTask: (data = {}) => request.post('/crawler/task/update', data),
-  syncOdsToWechat: (data = {}) => request.post('/crawler/ods/sync_to_wechat', data),
+  // crawler script platform
+  crawlerScriptList: (params = {}) => request.get('/crawler/script/list', { params }),
+  crawlerScriptGet: (params = {}) => request.get('/crawler/script/get', { params }),
+  crawlerScriptCreate: (data = {}) => request.post('/crawler/script/create', data),
+  crawlerScriptUpdate: (data = {}) => request.post('/crawler/script/update', data),
+  crawlerScriptDelete: (params = {}) => request.delete('/crawler/script/delete', { params }),
+  crawlerScriptRun: (data = {}) => request.post('/crawler/script/run', data),
+  crawlerScriptRunStatus: (params = {}) => request.get('/crawler/script/run_status', { params }),
+  crawlerScriptRunLogs: (params = {}) => request.get('/crawler/script/run_logs', { params }),
+
+  crawlerPipList: () => request.get('/crawler/pip/list'),
+  crawlerPipShow: (params = {}) => request.get('/crawler/pip/show', { params }),
+  crawlerPipInstall: (data = {}) => request.post('/crawler/pip/install', data),
+
+  crawlerSettingsGet: () => request.get('/crawler/settings/get'),
+  crawlerSettingsUpdate: (data = {}) => request.post('/crawler/settings/update', data),
+
+  // we123 crawler task
+  we123Start: (data = {}) => request.post('/crawler/task/we123/start', data),
+  we123Stop: () => request.post('/crawler/task/we123/stop'),
+  we123Status: () => request.get('/crawler/task/we123/status'),
+  we123GetXpaths: () => request.get('/crawler/task/we123/xpaths'),
+  we123UpdateXpaths: (data = {}) => request.post('/crawler/task/we123/xpaths', data),
+
 }
