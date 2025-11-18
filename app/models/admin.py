@@ -15,6 +15,9 @@ class User(BaseModel, TimestampMixin):
     is_active = fields.BooleanField(default=True, description="是否激活", index=True)
     is_superuser = fields.BooleanField(default=False, description="是否为超级管理员", index=True)
     last_login = fields.DatetimeField(null=True, description="最后登录时间", index=True)
+    # 微信绑定字段（用于小程序登录绑定）
+    wx_openid = fields.CharField(max_length=64, null=True, unique=True, index=True, description="微信OpenID")
+    wx_unionid = fields.CharField(max_length=64, null=True, index=True, description="微信UnionID")
     roles = fields.ManyToManyField("models.Role", related_name="user_roles")
     dept_id = fields.IntField(null=True, description="部门ID", index=True)
 

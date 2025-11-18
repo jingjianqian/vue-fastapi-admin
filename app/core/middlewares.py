@@ -8,7 +8,11 @@ from fastapi.responses import Response
 from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 from app.core.dependency import AuthControl
 from app.models.admin import AuditLog, User
@@ -190,3 +194,24 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
         process_time = int((end_time.timestamp() - start_time.timestamp()) * 1000)
         await self.after_request(request, response, process_time)
         return response
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, rate_limit: int = 60):
+        super().__init__(app)
+        self.rate_limit = rate_limit
+        self.requests = defaultdict(list)
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        # 仅限制小程序端接口
+        if request.url.path.startswith("/api/v1/wxapp"):
+            client_id = request.headers.get("token") or request.client.host
+            now = datetime.now()
+            window_start = now - timedelta(minutes=1)
+            # 清理窗口外记录
+            self.requests[client_id] = [t for t in self.requests[client_id] if t > window_start]
+            if len(self.requests[client_id]) >= self.rate_limit:
+                return JSONResponse(status_code=429, content={"code": 429, "msg": "请求过于频繁", "result": None, "data": None})
+            self.requests[client_id].append(now)
+        return await call_next(request)
+

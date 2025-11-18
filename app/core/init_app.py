@@ -4,6 +4,7 @@ from aerich import Command
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
+from tortoise import Tortoise
 from tortoise.expressions import Q
 
 from app.api import api_router
@@ -26,7 +27,7 @@ from app.models.admin import Api, Menu, Role
 from app.schemas.menus import MenuType
 from app.settings.config import settings
 
-from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
+from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware, RateLimitMiddleware
 
 
 def make_middlewares():
@@ -39,6 +40,7 @@ def make_middlewares():
             allow_headers=settings.CORS_ALLOW_HEADERS,
         ),
         Middleware(BackGroundTaskMiddleware),
+        Middleware(RateLimitMiddleware, rate_limit=settings.WXAPP_RATE_LIMIT_PER_MINUTE),
         Middleware(
             HttpAuditLogMiddleware,
             methods=["GET", "POST", "PUT", "DELETE"],
@@ -254,79 +256,6 @@ async def init_apis():
         await api_controller.refresh_api()
 
 
-async def ensure_crawler_api_permissions():
-    # 刷新API，确保 /api/v1/crawler/* 被收集
-    try:
-        await api_controller.refresh_api()
-    except Exception:
-        pass
-    # 为管理员角色赋予 /api/v1/crawler/* 接口权限
-    from app.models.admin import Api as ApiModel
-    admin = await Role.filter(name="管理员").first()
-    if not admin:
-        return
-    crawler_apis = await ApiModel.filter(path__startswith="/api/v1/crawler").all()
-    if crawler_apis:
-        await admin.apis.add(*crawler_apis)
-
-
-async def ensure_we123_scripts():
-    """创建 we123 启停脚本（用于 UI 脚本平台一键调用任务 API）。"""
-    try:
-        from app.models.script import Script
-        # 启动脚本
-        name_start = "we123 启动器"
-        exist = await Script.filter(name=name_start).exists()
-        if not exist:
-            code_start = (
-                "import json, urllib.request\n"
-                "def _post(url, data, token=None):\n"
-                "  req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type':'application/json'})\n"
-                "  if token: req.add_header('token', token)\n"
-                "  with urllib.request.urlopen(req, timeout=10) as resp:\n"
-                "    return json.loads(resp.read().decode('utf-8','ignore'))\n"
-                "def _login(base):\n"
-                "  data={'username':'admin','password':'123456'}\n"
-                "  r=_post(base+'/api/v1/base/access_token', data)\n"
-                "  return (r.get('data') or {}).get('access_token')\n"
-                "def main():\n"
-                "  base='http://127.0.0.1:9999'\n"
-                "  token=_login(base)\n"
-                "  payload={'start_id':1,'loop':False,'max_404_span':500,'delay_sec':3}\n"
-                "  r=_post(base+'/api/v1/crawler/task/we123/start', payload, token)\n"
-                "  print(json.dumps(r, ensure_ascii=False))\n"
-                "if __name__=='__main__':\n"
-                "  main()\n"
-            )
-            await Script.create(name=name_start, desc="启动 we123 爬虫任务", code=code_start, enabled=True)
-        # 停止脚本
-        name_stop = "we123 停止器"
-        exist2 = await Script.filter(name=name_stop).exists()
-        if not exist2:
-            code_stop = (
-                "import json, urllib.request\n"
-                "def _post(url, data=None, token=None):\n"
-                "  if data is None: data={}\n"
-                "  req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type':'application/json'})\n"
-                "  if token: req.add_header('token', token)\n"
-                "  with urllib.request.urlopen(req, timeout=10) as resp:\n"
-                "    return json.loads(resp.read().decode('utf-8','ignore'))\n"
-                "def _login(base):\n"
-                "  data={'username':'admin','password':'123456'}\n"
-                "  r=_post(base+'/api/v1/base/access_token', data)\n"
-                "  return (r.get('data') or {}).get('access_token')\n"
-                "def main():\n"
-                "  base='http://127.0.0.1:9999'\n"
-                "  token=_login(base)\n"
-                "  r=_post(base+'/api/v1/crawler/task/we123/stop', {}, token)\n"
-                "  print(json.dumps(r, ensure_ascii=False))\n"
-                "if __name__=='__main__':\n"
-                "  main()\n"
-            )
-            await Script.create(name=name_stop, desc="停止 we123 爬虫任务", code=code_stop, enabled=True)
-    except Exception:
-        # 不阻断启动流程
-        pass
 
 
 async def init_db():
@@ -341,10 +270,40 @@ async def init_db():
         await command.migrate()
     except AttributeError:
         logger.warning("unable to retrieve model history from database, model history will be created from scratch")
-        shutil.rmtree("migrations")
+        shutil.rmtree("migrations", ignore_errors=True)
         await command.init_db(safe=True)
 
-    await command.upgrade(run_in_transaction=True)
+    try:
+        await command.upgrade(run_in_transaction=True)
+    except Exception as e:
+        # 处理由于历史不一致导致的重复列等问题：重置迁移并与当前数据库状态对齐
+        msg = str(e)
+        if "Duplicate column name" in msg or "duplicate column" in msg.lower():
+            logger.warning(f"aerich upgrade failed due to duplicate column, try reset migrations: {e}")
+            try:
+                shutil.rmtree("migrations", ignore_errors=True)
+                await command.init_db(safe=True)
+                await command.init()
+                # 重新迁移并升级（若模型与数据库一致，将不会生成变更脚本）
+                try:
+                    await command.migrate()
+                except Exception:
+                    pass
+                await command.upgrade(run_in_transaction=True)
+            except Exception as e2:
+                logger.error(f"aerich reset migrations failed: {e2}")
+                # 兜底：直接用 Tortoise 生成缺失表/列（safe=True 不会覆盖已存在列）
+                try:
+                    await Tortoise.init(config=settings.TORTOISE_ORM)
+                    await Tortoise.generate_schemas(safe=True)
+                    logger.warning("fallback to Tortoise.generate_schemas(safe=True) completed")
+                    return
+                except Exception as e3:
+                    logger.error(f"fallback generate_schemas failed: {e3}")
+                    raise
+        else:
+            # 非重复列错误，直接抛出
+            raise
 
 
 async def init_roles():
@@ -378,6 +337,4 @@ async def init_data():
     await init_menus()
     await ensure_wechat_menu()
     await init_apis()
-    await ensure_crawler_api_permissions()
-    await ensure_we123_scripts()
     await init_roles()
