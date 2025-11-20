@@ -26,3 +26,12 @@ tests/
 
 # Uploaded files
 static/uploads/
+
+# Qinglong data directories
+deploy/qinglong/data/
+deploy/qinglong/config/
+deploy/qinglong/scripts/
+deploy/qinglong/repo/
+deploy/qinglong/log/
+deploy/qinglong/redis-data/
+deploy/qinglong/.env

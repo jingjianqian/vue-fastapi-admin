@@ -30,6 +30,25 @@ class AuthControl:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"{repr(e)}")
 
+    @classmethod
+    async def is_authed_optional(cls, token: Optional[str] = Header(None, description="可选token验证")) -> Optional["User"]:
+        """可选认证：有token则验证，无token则返回none，不抛异常"""
+        if not token:
+            return None
+        try:
+            if token == "dev":
+                user = await User.filter().first()
+                user_id = user.id
+            else:
+                decode_data = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.JWT_ALGORITHM)
+                user_id = decode_data.get("user_id")
+            user = await User.filter(id=user_id).first()
+            if user:
+                CTX_USER_ID.set(int(user_id))
+            return user
+        except Exception:
+            return None
+
 
 class PermissionControl:
     @classmethod
@@ -50,4 +69,5 @@ class PermissionControl:
 
 
 DependAuth = Depends(AuthControl.is_authed)
+DependAuthOptional = Depends(AuthControl.is_authed_optional)
 DependPermission = Depends(PermissionControl.has_permission)

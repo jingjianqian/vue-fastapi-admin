@@ -1,0 +1,87 @@
+<!--pages/home/home.wxml-->
+<view class="home-container">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-box">
+      <icon type="search" size="16" color="#999"></icon>
+      <input class="search-input" placeholder="搜索小程序" bindinput="onSearchInput" />
+    </view>
+  </view>
+
+  <!-- 横幅 Banner -->
+  <view class="banner-section" wx:if="{{banners.length > 0}}">
+    <swiper class="banner-swiper" indicator-dots autoplay interval="5000" circular>
+      <swiper-item wx:for="{{banners}}" wx:key="id">
+        <image class="banner-image" src="{{item.image_url}}" mode="aspectFill"></image>
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <!-- 分类 -->
+  <view class="category-section" wx:if="{{categories.length > 0}}">
+    <scroll-view class="category-scroll" scroll-x>
+      <view class="category-list">
+        <view 
+          class="category-item {{selectedCategory === item.id ? 'active' : ''}}" 
+          wx:for="{{categories}}" 
+          wx:key="id"
+          bindtap="onCategoryTap"
+          data-id="{{item.id}}">
+          <text class="category-name">{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 置顶小程序 -->
+  <view class="top-section" wx:if="{{topApps.length > 0}}">
+    <view class="section-title">
+      <text class="title-text">置顶推荐</text>
+    </view>
+    <view class="app-grid">
+      <view 
+        class="app-item" 
+        wx:for="{{topApps}}" 
+        wx:key="id"
+        bindtap="onAppTap"
+        data-id="{{item.id}}">
+        <image class="app-icon" src="{{item.icon}}" mode="aspectFill"></image>
+        <text class="app-name">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 小程序列表 -->
+  <view class="app-list-section">
+    <view class="section-title">
+      <text class="title-text">全部小程序</text>
+    </view>
+    
+    <view class="app-list">
+      <view 
+        class="list-item" 
+        wx:for="{{appList}}" 
+        wx:key="id"
+        bindtap="onAppTap"
+        data-id="{{item.id}}">
+        <image class="item-icon" src="{{item.icon}}" mode="aspectFill"></image>
+        <view class="item-info">
+          <text class="item-name">{{item.name}}</text>
+          <text class="item-desc">{{item.desc}}</text>
+        </view>
+        <view class="item-action">
+          <text class="action-text">进入</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 加载状态 -->
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="empty" wx:if="{{!loading && appList.length === 0}}">
+      <text class="empty-text">暂无数据</text>
+    </view>
+  </view>
+</view>
+
+<!-- 自定义tab栏 -->
+<custom-tab-bar />

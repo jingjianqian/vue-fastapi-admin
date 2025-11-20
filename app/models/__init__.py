@@ -2,4 +2,4 @@
 from .admin import *
 from .wechat import *
 from .wxapp_extra import *
-from .script import *
+from .miniprogram import *

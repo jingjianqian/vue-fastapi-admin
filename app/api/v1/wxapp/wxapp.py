@@ -12,9 +12,9 @@ from app.schemas.wxapp import (
     MpLogin,
     TrackEvent,
 )
-from app.core.dependency import DependAuth
+from app.core.dependency import DependAuth, DependAuthOptional
 from app.models.wechat import WechatApp
-from app.models.wxapp_extra import Category, Banner, Favorite, Event
+from app.models.wxapp_extra import Category, Banner, Favorite, Event, WxUser
 
 # 认证与配置
 import jwt
@@ -35,7 +35,7 @@ router = APIRouter(tags=["小程序前台接口(wxapp)"])
 async def mp_login(body: MpLogin):
     """
     - 调用微信 code2session 获取 openid/session_key/unionid
-    - 若不存在则创建用户（username/email 由 openid 派生，绑定 wx_openid/wx_unionid），并自动授予“葡萄用户”角色
+    - 若不存在则创建用户（username/email 由 openid 派生，绑定 wx_openid/wx_unionid），并自动授予"葡萄用户"角色
     - 返回 JWT，前端以 header: token 传递
     """
     from app.models.admin import User, Role
@@ -88,16 +88,56 @@ async def mp_login(body: MpLogin):
         if updated:
             await user.save()
 
-    # 确保“葡萄用户”角色存在并授予
+    # 确保"葡萄用户"角色存在并授予
     role_name = "葡萄用户"
     role = await Role.filter(name=role_name).first()
     if not role:
         role = await Role.create(name=role_name, desc="MiniProgram User")
     await user.roles.add(role)
 
-    # 签发 JWT
+    # 更新用户昵称/头像（如果提供）
+    updated_profile = False
+    if body.nickname and body.nickname != user.username:
+        user.alias = body.nickname
+        updated_profile = True
+    if body.avatarUrl:
+        user.avatar = body.avatarUrl
+        updated_profile = True
+    if updated_profile:
+        await user.save()
+
+    # 记录/更新 WxUser 档案
+    try:
+        wx_user = await WxUser.filter(wx_openid=openid).first()
+        now = datetime.now(timezone.utc)
+        if not wx_user:
+            await WxUser.create(
+                wx_openid=openid,
+                wx_unionid=unionid,
+                nickname=body.nickname,
+                avatar_url=body.avatarUrl,
+                last_login_at=now,
+            )
+        else:
+            changed = False
+            if body.nickname and body.nickname != wx_user.nickname:
+                wx_user.nickname = body.nickname
+                changed = True
+            if body.avatarUrl and body.avatarUrl != wx_user.avatar_url:
+                wx_user.avatar_url = body.avatarUrl
+                changed = True
+            wx_user.last_login_at = now
+            if changed:
+                await wx_user.save()
+            else:
+                # 即使未改动头像/昵称，也要刷新最后登录时间
+                await wx_user.save()
+    except Exception:
+        pass
+
+    # 签发 JWT（与 PC 端保持一致的格式）
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = create_access_token(
+    access_token = create_access_token(
         data=JWTPayload(
             user_id=user.id,
             username=user.username,
@@ -105,8 +145,21 @@ async def mp_login(body: MpLogin):
             exp=expire,
         )
     )
-    user_out = {"id": user.id, "nickname": body.nickname or user.username, "avatar": body.avatarUrl or ""}
-    return Success(data={"token": token, "user": user_out})
+    
+    # 返回用户信息，包含昵称和头像
+    user_info = {
+        "id": user.id,
+        "username": user.username,
+        "nickname": user.alias or user.username,
+        "avatar": user.avatar or (body.avatarUrl or ""),
+        "is_superuser": user.is_superuser
+    }
+    
+    return Success(data={
+        "access_token": access_token, 
+        "username": user.username,
+        "user": user_info
+    })
 
 
 def _app_to_item(o: WechatApp) -> dict:
@@ -130,7 +183,7 @@ async def home(
     category_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    request: Request = None,
+    current_user: Optional[User] = DependAuthOptional,
 ):
     qexp = Q(is_deleted=False)
     if q:
@@ -145,26 +198,18 @@ async def home(
     items = [_app_to_item(o) for o in objs]
 
     # 若用户已登录，批量查询收藏状态
-    try:
-        token = request.headers.get("token") if request else None
-        user_id = None
-        if token:
-            try:
-                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-                user_id = payload.get("user_id")
-            except Exception:
-                user_id = None
-        if user_id:
+    if current_user:
+        try:
             app_ids = [item["id"] for item in items]
-            favs = await Favorite.filter(user_id=user_id, app_id__in=app_ids)
+            favs = await Favorite.filter(user_id=current_user.id, app_id__in=app_ids)
             fav_map = {f.app_id: f for f in favs}
             for item in items:
                 fav = fav_map.get(item["id"])
                 if fav:
                     item["is_favorited"] = True
                     item["is_pinned"] = bool(fav.is_pinned)
-    except Exception:
-        pass
+        except Exception:
+            pass
     
     # 分类与横幅：表未迁移时容错
     try:
@@ -235,7 +280,7 @@ async def auth_profile(current_user=DependAuth):
             "id": user.id,
             "username": user.username,
             "nickname": getattr(user, "alias", None) or user.username,
-            "avatar": "",
+            "avatar": getattr(user, "avatar", "") or "",
             "is_superuser": user.is_superuser,
         }
         return Success(data=profile)
@@ -245,7 +290,7 @@ async def auth_profile(current_user=DependAuth):
 
 
 @router.get("/detail/{id}", summary="小程序详情")
-async def wxapp_detail(id: int, request: Request = None):
+async def wxapp_detail(id: int, current_user: Optional[User] = DependAuthOptional):
     obj: Optional[WechatApp] = await WechatApp.filter(id=id, is_deleted=False).first()
     if not obj:
         return Fail(code=404, msg="小程序不存在")
@@ -259,18 +304,14 @@ async def wxapp_detail(id: int, request: Request = None):
     })
 
     # 登录态下追加收藏状态
-    try:
-        token = request.headers.get("token") if request else None
-        if token:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-            user_id = payload.get("user_id")
-            if user_id:
-                fav = await Favorite.filter(user_id=user_id, app_id=obj.id).first()
-                if fav:
-                    item["is_favorited"] = True
-                    item["is_pinned"] = bool(fav.is_pinned)
-    except Exception:
-        pass
+    if current_user:
+        try:
+            fav = await Favorite.filter(user_id=current_user.id, app_id=obj.id).first()
+            if fav:
+                item["is_favorited"] = True
+                item["is_pinned"] = bool(fav.is_pinned)
+        except Exception:
+            pass
 
     return Success(data=item)
 
@@ -358,9 +399,11 @@ async def get_qr(id: Optional[int] = Query(None), appid: Optional[str] = Query(N
 
 
 @router.post("/track/event", summary="埋点事件上报")
-async def track_event(body: TrackEvent, current_user=DependAuth):
+async def track_event(body: TrackEvent, current_user=DependAuthOptional):
     try:
-        await Event.create(user_id=current_user.id, event=body.event, payload=body.payload or {})
+        # 如果用户已登录则记录user_id，否则为None
+        user_id = current_user.id if current_user else None
+        await Event.create(user_id=user_id, event=body.event, payload=body.payload or {})
         return Success(data={"ok": True})
     except Exception as e:
         # 表未迁移时容错

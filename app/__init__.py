@@ -40,8 +40,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     
-    # Mount static files
-    app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
+    # Mount static files（使用配置的前缀，默认 /static）
+    static_prefix = getattr(settings, "STATIC_URL_PREFIX", "/static") or "/static"
+    if not static_prefix.startswith("/"):
+        static_prefix = "/" + static_prefix
+    static_prefix = static_prefix.rstrip("/")
+    app.mount(static_prefix, StaticFiles(directory=settings.STATIC_DIR), name="static")
     
     register_exceptions(app)
     register_routers(app, prefix="/api")

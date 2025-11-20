@@ -1,5 +1,6 @@
 import json
 import re
+import jwt
 from datetime import datetime
 from typing import Any, AsyncGenerator
 
@@ -16,6 +17,7 @@ from datetime import datetime, timedelta
 
 from app.core.dependency import AuthControl
 from app.models.admin import AuditLog, User
+from app.settings import settings
 
 from .bgtask import BgTasks
 
@@ -154,7 +156,13 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
             token = request.headers.get("token")
             user_obj = None
             if token:
-                user_obj: User = await AuthControl.is_authed(token)
+                # 使用直接解析 token 而不是调用 is_authed（避免 Header 依赖问题）
+                try:
+                    decode_data = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.JWT_ALGORITHM)
+                    user_id = decode_data.get("user_id")
+                    user_obj = await User.filter(id=user_id).first()
+                except Exception:
+                    pass
             data["user_id"] = user_obj.id if user_obj else 0
             data["username"] = user_obj.username if user_obj else ""
         except Exception:

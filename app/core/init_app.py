@@ -276,11 +276,21 @@ async def init_db():
     try:
         await command.upgrade(run_in_transaction=True)
     except Exception as e:
-        # 处理由于历史不一致导致的重复列等问题：重置迁移并与当前数据库状态对齐
+        # 处理由于历史不一致导致的问题：
+        # - 从 SQLite 切换到 MySQL 后，旧迁移脚本里的 DDL 语句（含 AUTOINCREMENT / 双引号等）在 MySQL 中会报语法错误
+        # - 或由于字段调整导致的重复列错误
         msg = str(e)
+        need_reset = False
         if "Duplicate column name" in msg or "duplicate column" in msg.lower():
-            logger.warning(f"aerich upgrade failed due to duplicate column, try reset migrations: {e}")
+            need_reset = True
+        # MySQL 语法错误（典型：You have an error in your SQL syntax ... AUTOINCREMENT ...）
+        if "You have an error in your SQL syntax" in msg or "AUTOINCREMENT" in msg:
+            need_reset = True
+
+        if need_reset:
+            logger.warning(f"aerich upgrade failed, try reset migrations: {e}")
             try:
+                # 删除旧 migrations（原来是基于 SQLite 生成的），按当前模型和数据库状态重建
                 shutil.rmtree("migrations", ignore_errors=True)
                 await command.init_db(safe=True)
                 await command.init()
@@ -302,7 +312,7 @@ async def init_db():
                     logger.error(f"fallback generate_schemas failed: {e3}")
                     raise
         else:
-            # 非重复列错误，直接抛出
+            # 其它类型错误，直接抛出
             raise
 
 

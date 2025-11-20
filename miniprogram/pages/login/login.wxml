@@ -1,0 +1,31 @@
+<!--pages/login/login.wxml-->
+<view class="login-container">
+  <view class="login-box">
+    <!-- Logo -->
+    <view class="logo-section">
+      <image class="logo" src="/assets/logo.png" mode="aspectFit"></image>
+      <text class="app-name">葡萄小程序</text>
+      <text class="app-desc">欢迎使用</text>
+    </view>
+
+    <!-- 登录按钮 -->
+    <view class="login-section">
+      <button class="login-btn" type="primary" bindtap="handleLogin" loading="{{loading}}">
+        <text wx:if="{{!loading}}">微信授权登录</text>
+        <text wx:else>登录中...</text>
+      </button>
+      
+      <view class="tips">
+        <text class="tip-text">登录即表示同意</text>
+        <text class="tip-link">《用户协议》</text>
+        <text class="tip-text">和</text>
+        <text class="tip-link">《隐私政策》</text>
+      </view>
+    </view>
+
+    <!-- Mock 提示 -->
+    <view class="mock-tips" wx:if="{{useMock}}">
+      <text class="mock-text">🔧 当前使用 Mock 数据模式</text>
+    </view>
+  </view>
+</view>

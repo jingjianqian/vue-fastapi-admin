@@ -1,0 +1,20 @@
+<!--pages/favorite/favorite.wxml-->
+<view class="favorite-container">
+  <view class="favorite-list" wx:if="{{list.length > 0}}">
+    <view class="list-item" wx:for="{{list}}" wx:key="id" bindtap="onAppTap" data-id="{{item.id}}">
+      <image class="item-icon" src="{{item.icon}}" mode="aspectFill"></image>
+      <view class="item-info">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-desc">{{item.desc}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:else>
+    <text class="empty-icon">📋</text>
+    <text class="empty-text">暂无收藏</text>
+  </view>
+</view>
+
+<!-- 自定义tab栏 -->
+<custom-tab-bar />

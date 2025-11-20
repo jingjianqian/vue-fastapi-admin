@@ -7,6 +7,45 @@ from fastapi import HTTPException, UploadFile
 from app.settings.config import settings
 
 
+def convert_to_absolute_path(relative_path: str | None) -> str | None:
+    """
+    将相对路径转换为绝对路径
+    
+    用于将数据库中存储的相对路径（如 'uploads/wechat/logo/123.jpg'）
+    转换为本地文件系统的绝对路径，供上传或其他文件操作使用。
+    
+    Args:
+        relative_path: 相对路径，通常以 'uploads/' 或 'static/' 开头
+        
+    Returns:
+        绝对路径，如果输入为空则返回 None
+        
+    Examples:
+        >>> convert_to_absolute_path('uploads/wechat/logo/123.jpg')
+        'E:\\code\\my\\vue-fastapi-admin\\static\\uploads\\wechat\\logo\\123.jpg'
+        
+        >>> convert_to_absolute_path('static/uploads/wechat/logo/123.jpg')
+        'E:\\code\\my\\vue-fastapi-admin\\static\\uploads\\wechat\\logo\\123.jpg'
+    """
+    if not relative_path:
+        return None
+    
+    # 规范化路径分隔符（统一为正斜杠）
+    normalized = relative_path.replace("\\", "/")
+    
+    # 移除开头的 'static/' 前缀（如果存在）
+    if normalized.startswith("static/"):
+        normalized = normalized[7:]  # 去掉 'static/'
+    
+    # 拼接绝对路径
+    absolute_path = os.path.join(settings.STATIC_DIR, normalized)
+    
+    # 规范化路径（处理 ../ 等）
+    absolute_path = os.path.normpath(absolute_path)
+    
+    return absolute_path
+
+
 def get_file_extension(filename: str) -> str:
     """获取文件扩展名"""
     if not filename or "." not in filename:

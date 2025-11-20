@@ -11,6 +11,7 @@ from .roles import roles_router
 from .users import users_router
 from .wechat import wechat_router
 from .wxapp import wxapp_router
+from .miniprogram import miniprogram_router
 
 v1_router = APIRouter()
 
@@ -24,3 +25,5 @@ v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[Depe
 v1_router.include_router(wechat_router, prefix="/wechat", dependencies=[DependPermission])
 # wxapp 面向小程序端，GET 匿名可读，写接口内部做鉴权
 v1_router.include_router(wxapp_router, prefix="/wxapp")
+# miniprogram 爬虫数据接口，需要API Key鉴权
+v1_router.include_router(miniprogram_router, prefix="/miniprogram")

@@ -12,7 +12,7 @@
 - Banner：用于首页顶部轮播的 WechatApp 或独立素材项。
 
 ## 3. 信息架构与导航
-- 底部 3 个 Tab：
+|- 底部 3 个 Tab（底部 tabBar 单行横向排列 3 项）：`首页` / `收藏` / `我的`
   1) 首页（home）
      - 吸顶搜索（默认隐藏，向上滚动出现）
      - Banner 轮播
@@ -444,8 +444,15 @@ M6（D11）：验收与优化
 ```
 
 ## 22. guide 现状复用与界面方案
-
-- 复用目录与页面：保留 pages/index（首页）、pages/favorites（收藏）、pages/my（我的）的整体框架与路由；
+|
+|- tabBar 配置规范（guide/app.json）：
+|  - 使用微信原生 tabBar，一行仅 3 个 item，依次为：首页 / 收藏 / 我的；
+|  - `pagePath` 固定为：`pages/index/index`、`pages/favorites/index`、`pages/my/index`；
+|  - 文案（`text`）分别为：`首页`、`收藏`、`我的`，禁止使用多行文案或拆为多行入口；
+|  - icon 建议统一风格（如 `home.png` / `favorite.png` / `user.png`），高亮与未高亮各一套；
+|  - 严禁通过自定义组件或多个 tabBar 模拟“多行导航”，实现上必须是系统底部单行 tabBar。
+|
+|- 复用目录与页面：保留 pages/index（首页）、pages/favorites（收藏）、pages/my（我的）的整体框架与路由；
 - 新增通用组件：
   - components/app-card：展示 logo/name/desc/收藏与常用置顶按钮；事件 tap/toggleCollect/togglePin；
   - components/qr-modal：统一二维码弹窗；参数 visible/item/imageUrl/loading；
@@ -475,8 +482,9 @@ M6（D11）：验收与优化
 - 曝光节流：app_expose 需去重与节流；滚动侦听限频；
 
 ## 24. 改造清单与质量项（guide 代码级）
-
-- API 路径与方法统一（如 qr_code_url GET/POST 混用、末尾斜杠不一致）；
+|
+|- tabBar 布局：底部 tabBar 必须为**单行横向 3 个 Tab**（首页 / 收藏 / 我的），等分宽度显示，禁止出现三行纵向排列的 tab 栏；
+|- API 路径与方法统一（如 qr_code_url GET/POST 混用、末尾斜杠不一致）；
 - 字段映射清理：移除 openid 充当 appid 的做法，由适配层兼容老数据；
 - 登录判断切换为 token 优先；
 - 导航栏高度算法统一为 favorites 页实现；修复 index 页 3*navBarHeight 异常；

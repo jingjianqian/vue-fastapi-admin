@@ -68,10 +68,11 @@ const handleUpload = (kind) => {
       formData.append('kind', kind)
       const res = await api.uploadWechatFile(formData)
       if (res && res.data) {
+        // 数据库存相对路径（path），避免跨环境域名变化
         if (kind === 'logo') {
-          modalForm.value.logo_url = res.data.url
+          modalForm.value.logo_url = res.data.path
         } else if (kind === 'qrcode') {
-          modalForm.value.qrcode_url = res.data.url
+          modalForm.value.qrcode_url = res.data.path
         }
         window.$message.success('上传成功')
       }
@@ -143,7 +144,8 @@ const columns = [
     width: 100,
     align: 'center',
     render(row) {
-      return row.logo_url ? h(NImage, { src: row.logo_url, width: 40, height: 40, objectFit: 'cover' }) : null
+      const src = row.logo_url_public || row.logo_url_tracked || row.logo_url
+      return src ? h(NImage, { src, width: 40, height: 40, objectFit: 'cover' }) : null
     },
   },
   {
@@ -152,7 +154,8 @@ const columns = [
     width: 100,
     align: 'center',
     render(row) {
-      return row.qrcode_url ? h(NImage, { src: row.qrcode_url, width: 40, height: 40, objectFit: 'cover' }) : null
+      const src = row.qrcode_url_public || row.qrcode_url_tracked || row.qrcode_url
+      return src ? h(NImage, { src, width: 40, height: 40, objectFit: 'cover' }) : null
     },
   },
   {

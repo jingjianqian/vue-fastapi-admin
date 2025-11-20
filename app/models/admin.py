@@ -18,6 +18,7 @@ class User(BaseModel, TimestampMixin):
     # 微信绑定字段（用于小程序登录绑定）
     wx_openid = fields.CharField(max_length=64, null=True, unique=True, index=True, description="微信OpenID")
     wx_unionid = fields.CharField(max_length=64, null=True, index=True, description="微信UnionID")
+    avatar = fields.CharField(max_length=255, null=True, description="用户头像URL")
     roles = fields.ManyToManyField("models.Role", related_name="user_roles")
     dept_id = fields.IntField(null=True, description="部门ID", index=True)
 
