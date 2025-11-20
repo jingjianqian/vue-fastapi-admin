@@ -35,3 +35,4 @@ deploy/qinglong/repo/
 deploy/qinglong/log/
 deploy/qinglong/redis-data/
 deploy/qinglong/.env
+/static
