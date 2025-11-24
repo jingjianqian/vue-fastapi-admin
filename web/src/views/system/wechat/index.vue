@@ -1,5 +1,5 @@
 <script setup>
-import { h, onMounted, ref, watch, nextTick } from 'vue'
+import { h, onMounted, ref, watch, nextTick, computed } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NPopconfirm, NSelect, NImage, NSwitch, NTag, NUpload, NSpace } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -16,14 +16,14 @@ const tableRef = ref(null)
 const selectedRowKeys = ref([])
 const batchLoading = ref(false)
 
-const publishStatusOptions = ref([
+const publishStatusOptions = computed(() => [
   { label: '草稿', value: 'draft' },
   { label: '审核中', value: 'review' },
   { label: '已发布', value: 'published' },
   { label: '禁用', value: 'disabled' },
 ])
 
-const deleteStatusOptions = ref([
+const deleteStatusOptions = computed(() => [
   { label: '未删除', value: 'not_deleted' },
   { label: '已删除', value: 'deleted' },
   { label: '全部', value: 'all' },
@@ -140,6 +140,8 @@ const handleRestore = async (row) => {
 
 onMounted(() => {
   console.log('[Wechat] onMounted 触发', { tableRef: tableRef.value })
+  console.log('[Wechat] publishStatusOptions:', publishStatusOptions.value)
+  console.log('[Wechat] deleteStatusOptions:', deleteStatusOptions.value)
   if (tableRef.value) {
     console.log('[Wechat] 调用 handleSearch')
     tableRef.value.handleSearch()
