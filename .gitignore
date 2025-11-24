@@ -24,8 +24,8 @@ todo.md
 guide/
 tests/
 
-# Uploaded files
-static/uploads/
+# Uploaded files and static directory
+/static/
 
 # Qinglong data directories
 deploy/qinglong/data/
@@ -35,6 +35,3 @@ deploy/qinglong/repo/
 deploy/qinglong/log/
 deploy/qinglong/redis-data/
 deploy/qinglong/.env
-/static
-/static
-/static
