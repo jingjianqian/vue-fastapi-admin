@@ -13,19 +13,21 @@ import { useCRUD } from '@/composables'
 import api from '@/api'
 
 const tableRef = ref(null)
+const selectedRowKeys = ref([])
+const batchLoading = ref(false)
 
-const publishStatusOptions = [
+const publishStatusOptions = ref([
   { label: '草稿', value: 'draft' },
   { label: '审核中', value: 'review' },
   { label: '已发布', value: 'published' },
   { label: '禁用', value: 'disabled' },
-]
+])
 
-const deleteStatusOptions = [
+const deleteStatusOptions = ref([
   { label: '未删除', value: 'not_deleted' },
   { label: '已删除', value: 'deleted' },
   { label: '全部', value: 'all' },
-]
+])
 
 const queryItems = ref({ 
   name: null, 
@@ -84,6 +86,47 @@ const handleUpload = (kind) => {
   }
 }
 
+// 处理表格勾选
+const handleTableChecked = (keys) => {
+  selectedRowKeys.value = keys
+}
+
+// 批量发布功能
+const handleBatchPublish = async () => {
+  if (selectedRowKeys.value.length === 0) {
+    window.$message.warning('请先选择要发布的记录')
+    return
+  }
+  
+  try {
+    batchLoading.value = true
+    const tasks = selectedRowKeys.value.map(id => 
+      api.updateWechatStatus({ id, publish_status: 'published' })
+    )
+    const results = await Promise.allSettled(tasks)
+    
+    const ok = results.filter(r => r.status === 'fulfilled').length
+    const fail = results.length - ok
+    
+    if (ok > 0 && fail === 0) {
+      window.$message.success(`成功发布 ${ok} 条`)
+    } else if (ok > 0 && fail > 0) {
+      window.$message.warning(`成功发布 ${ok} 条，失败 ${fail} 条`)
+    } else {
+      window.$message.error('批量发布失败')
+    }
+    
+    // 刷新表格
+    tableRef.value?.handleSearch()
+    // 清空选择
+    selectedRowKeys.value = []
+  } catch (error) {
+    window.$message.error('批量发布失败: ' + (error.message || '未知错误'))
+  } finally {
+    batchLoading.value = false
+  }
+}
+
 // 恢复功能
 const handleRestore = async (row) => {
   try {
@@ -118,6 +161,7 @@ watch(() => queryItems.value.delete_status, () => {
 })
 
 const columns = [
+  { type: 'selection', fixed: 'left' },
   { 
     title: 'ID', 
     key: 'id', 
@@ -129,8 +173,8 @@ const columns = [
   },
   { title: '名称', key: 'name', width: 140, align: 'center', ellipsis: { tooltip: true } },
   { title: 'AppID', key: 'appid', width: 200, align: 'center', ellipsis: { tooltip: true } },
-  { title: 'Secret', key: 'secret', width: 220, align: 'center', ellipsis: { tooltip: true } },
-  { title: '版本', key: 'version', width: 100, align: 'center', ellipsis: { tooltip: true } },
+  // { title: 'Secret', key: 'secret', width: 220, align: 'center', ellipsis: { tooltip: true } },
+  // { title: '版本', key: 'version', width: 100, align: 'center', ellipsis: { tooltip: true } },
   {
     title: '描述',
     key: 'description',
@@ -327,9 +371,18 @@ const rules = {
       <NButton type="primary" @click="handleAdd">
         <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建小程序
       </NButton>
+      <NButton 
+        type="success" 
+        :disabled="selectedRowKeys.length === 0" 
+        :loading="batchLoading"
+        @click="handleBatchPublish"
+        style="margin-left: 12px;"
+      >
+        <TheIcon icon="material-symbols:publish" :size="18" class="mr-5" />批量发布
+      </NButton>
     </template>
 
-<CrudTable ref="tableRef" :columns="columns" :query-items="queryItems" :get-data="getList" :scroll-x="1600">
+<CrudTable ref="tableRef" :columns="columns" :query-items="queryItems" :get-data="getList" :scroll-x="1600" @on-checked="handleTableChecked">
       <template #queryBar>
         <QueryBarItem label="名称">
           <NInput v-model:value="queryItems.name" placeholder="按名称搜索" />
@@ -338,10 +391,18 @@ const rules = {
           <NInput v-model:value="queryItems.appid" placeholder="按AppID搜索" />
         </QueryBarItem>
         <QueryBarItem label="状态">
-<NSelect v-model:value="queryItems.publish_status" :options="publishStatusOptions" clearable :to="'body'" />
+          <NSelect 
+            v-model:value="queryItems.publish_status" 
+            :options="publishStatusOptions" 
+            placeholder="请选择" 
+            clearable 
+          />
         </QueryBarItem>
         <QueryBarItem label="删除状态">
-<NSelect v-model:value="queryItems.delete_status" :options="deleteStatusOptions" :to="'body'" />
+          <NSelect 
+            v-model:value="queryItems.delete_status" 
+            :options="deleteStatusOptions" 
+          />
         </QueryBarItem>
       </template>
     </CrudTable>
@@ -391,7 +452,10 @@ const rules = {
         <NInput v-model:value="modalForm.version" placeholder="如 1.0.0" disabled />
       </NFormItem>
       <NFormItem label="状态" path="publish_status">
-<NSelect v-model:value="modalForm.publish_status" :options="publishStatusOptions" :to="'body'" />
+        <NSelect 
+          v-model:value="modalForm.publish_status" 
+          :options="publishStatusOptions" 
+        />
       </NFormItem>
       <NFormItem label="描述" path="description">
         <NInput v-model:value="modalForm.description" type="textarea" :autosize="{ minRows: 3 }" placeholder="请输入小程序描述" />

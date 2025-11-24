@@ -54,6 +54,16 @@ export default {
   }),
   restoreWechat: (data = {}) => request.post('/wechat/restore', data),
 
+  // banner
+  getBannerList: (params = {}) => request.get('/banner/list', { params }),
+  getBannerById: (params = {}) => request.get('/banner/get', { params }),
+  createBanner: (data = {}) => request.post('/banner/create', data),
+  updateBanner: (data = {}) => request.post('/banner/update', data),
+  deleteBanner: (params = {}) => request.delete('/banner/delete', { params }),
+  uploadBannerFile: (formData) => request.post('/banner/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+
   // （爬虫脚本平台已移除，相关接口废弃）
 
 }

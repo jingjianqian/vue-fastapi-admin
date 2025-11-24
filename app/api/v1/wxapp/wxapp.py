@@ -15,6 +15,7 @@ from app.schemas.wxapp import (
 from app.core.dependency import DependAuth, DependAuthOptional
 from app.models.wechat import WechatApp
 from app.models.wxapp_extra import Category, Banner, Favorite, Event, WxUser
+from app.api.v1.wechat.wechat import _to_public_url
 
 # 认证与配置
 import jwt
@@ -162,12 +163,17 @@ async def mp_login(body: MpLogin):
     })
 
 
-def _app_to_item(o: WechatApp) -> dict:
+def _app_to_item(o: WechatApp, request: Request) -> dict:
+    """将 WechatApp 模型转换为小程序使用的字典结构。
+
+    为兼容数据库中存储相对路径的情况，这里会将 logo_url 转换为可直接访问的完整 URL。
+    """
     return {
         "id": o.id,
         "appid": o.appid,
         "name": o.name,
-        "icon": o.logo_url or "",
+        # 小程序端直接展示图标，需要完整可访问的 URL
+        "icon": _to_public_url(o.logo_url, request),
         "desc": o.description or "",
         "category_id": o.category_id,
         "is_top": o.is_top,
@@ -179,6 +185,7 @@ def _app_to_item(o: WechatApp) -> dict:
 
 @router.get("/home", summary="首页聚合（含分类/横幅/置顶；登录用户带收藏状态）")
 async def home(
+    request: Request,
     q: Optional[str] = Query(None),
     category_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
@@ -195,7 +202,8 @@ async def home(
     objs: List[WechatApp] = (
         await WechatApp.filter(qexp).offset((page - 1) * page_size).limit(page_size).order_by("id")
     )
-    items = [_app_to_item(o) for o in objs]
+    # 转换为前端使用的数据结构，并将图标路径转换为完整 URL
+    items = [_app_to_item(o, request) for o in objs]
 
     # 若用户已登录，批量查询收藏状态
     if current_user:
@@ -214,15 +222,24 @@ async def home(
     # 分类与横幅：表未迁移时容错
     try:
         cats = await Category.filter(is_online=True).order_by("sort", "id")
-        categories = [{"id": c.id, "name": c.name, "icon_url": c.icon_url} for c in cats]
+        # 分类图标也可能是相对路径，这里统一转换为完整 URL
+        categories = [
+            {
+                "id": c.id,
+                "name": c.name,
+                "icon_url": _to_public_url(c.icon_url, request),
+            }
+            for c in cats
+        ]
     except Exception:
         categories = []
     try:
         banners_qs = await Banner.filter(is_online=True).order_by("sort", "id")
+        # Banner 图片同样转换为完整 URL
         banners = [
             {
                 "id": b.id,
-                "image_url": b.image_url,
+                "image_url": _to_public_url(b.image_url, request),
                 "app_id": b.app_id,
                 "jump_appid": b.jump_appid,
                 "jump_path": b.jump_path,
@@ -236,7 +253,7 @@ async def home(
     # 置顶列表：后台置顶 is_top=True
     try:
         top_objs = await WechatApp.filter(is_deleted=False, is_top=True).order_by("id")
-        top = [_app_to_item(o) for o in top_objs]
+        top = [_app_to_item(o, request) for o in top_objs]
     except Exception:
         top = []
     
@@ -253,6 +270,7 @@ async def home(
 
 @router.get("/list", summary="小程序列表（最小实现）")
 async def wxapp_list(
+    request: Request,
     q: Optional[str] = Query(None),
     category_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
@@ -268,7 +286,7 @@ async def wxapp_list(
     objs: List[WechatApp] = (
         await WechatApp.filter(qexp).offset((page - 1) * page_size).limit(page_size).order_by("id")
     )
-    items = [_app_to_item(o) for o in objs]
+    items = [_app_to_item(o, request) for o in objs]
     return Success(data={"list": items, "total": total, "page": page, "page_size": page_size})
 
 
@@ -290,15 +308,17 @@ async def auth_profile(current_user=DependAuth):
 
 
 @router.get("/detail/{id}", summary="小程序详情")
-async def wxapp_detail(id: int, current_user: Optional[User] = DependAuthOptional):
+async def wxapp_detail(id: int, request: Request, current_user: Optional[User] = DependAuthOptional):
     obj: Optional[WechatApp] = await WechatApp.filter(id=id, is_deleted=False).first()
     if not obj:
         return Fail(code=404, msg="小程序不存在")
-    item = _app_to_item(obj)
+    # 详情页同样使用完整 URL 图标
+    item = _app_to_item(obj, request)
     # 追加扩展字段
     item.update({
         "desc": obj.description or "",
-        "qrcode_url": obj.qrcode_url or "",
+        # 小程序端展示二维码需要完整 URL
+        "qrcode_url": _to_public_url(obj.qrcode_url, request),
         "version": obj.version or "",
         "publish_status": obj.publish_status.name if getattr(obj, "publish_status", None) else "",
     })
@@ -317,10 +337,18 @@ async def wxapp_detail(id: int, current_user: Optional[User] = DependAuthOptiona
 
 
 @router.get("/categories", summary="分类列表")
-async def categories():
+async def categories(request: Request):
     try:
         cats = await Category.filter(is_online=True).order_by("sort", "id")
-        data = [{"id": c.id, "name": c.name, "icon_url": c.icon_url} for c in cats]
+        # 分类图标也转换为完整 URL
+        data = [
+            {
+                "id": c.id,
+                "name": c.name,
+                "icon_url": _to_public_url(c.icon_url, request),
+            }
+            for c in cats
+        ]
         return Success(data=data)
     except Exception:
         # 表未迁移等情况下返回空数组
@@ -329,6 +357,7 @@ async def categories():
 
 @router.get("/favorite/list", summary="我的收藏", dependencies=[DependAuth])
 async def favorite_list(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     category_id: Optional[int] = Query(None),
@@ -345,7 +374,7 @@ async def favorite_list(
             a = app_map.get(f.app_id)
             if not a:
                 continue
-            item = _app_to_item(a)
+            item = _app_to_item(a, request)
             item["is_favorited"] = True
             item["is_pinned"] = bool(f.is_pinned)
             items.append(item)
@@ -388,14 +417,20 @@ async def favorite_pin(body: FavoritePin, current_user=DependAuth):
 
 
 @router.get("/qr", summary="获取二维码URL（最小实现）")
-async def get_qr(id: Optional[int] = Query(None), appid: Optional[str] = Query(None)):
+async def get_qr(
+    request: Request,
+    id: Optional[int] = Query(None),
+    appid: Optional[str] = Query(None),
+):
     obj: Optional[WechatApp] = None
     if id is not None:
         obj = await WechatApp.filter(id=id).first()
     elif appid:
         obj = await WechatApp.filter(appid=appid).first()
-    qr = obj.qrcode_url if obj else ""
-    return Success(data={"qr_code_url": qr or ""})
+    # 将数据库中的相对路径转换为完整可访问的 URL，供小程序直接展示/下载
+    qr_raw = obj.qrcode_url if obj else ""
+    qr_public = _to_public_url(qr_raw, request) if qr_raw else ""
+    return Success(data={"qr_code_url": qr_public or ""})
 
 
 @router.post("/track/event", summary="埋点事件上报")
